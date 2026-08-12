@@ -1,17 +1,15 @@
-package com.omnibid.auction.event;
+package com.omnibid.auction.messaging;
 
 import java.io.Serial;
 import java.io.Serializable;
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.util.UUID;
 
-public record BidPlacedEvent(
-        UUID bidId,
-        UUID auctionId,
+public record RefundCommand(
+        UUID transactionId,
         UUID userId,
-        BigDecimal bidAmount,
-        Instant timestamp
+        UUID auctionId,
+        BigDecimal amount
 ) implements Serializable {
 
     @Serial

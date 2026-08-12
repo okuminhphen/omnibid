@@ -70,4 +70,9 @@ public class Auction {
         currentPrice = bidAmount;
         winningUserId = userId;
     }
+
+    public void end(Instant endedAt) {
+        status = AuctionStatus.ENDED;
+        endTime = endedAt;
+    }
 }

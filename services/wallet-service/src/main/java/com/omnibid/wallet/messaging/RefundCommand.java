@@ -3,11 +3,10 @@ package com.omnibid.wallet.messaging;
 import java.math.BigDecimal;
 import java.util.UUID;
 
-public record RefundMessage(
-        String messageId,
-        UUID walletId,
+public record RefundCommand(
+        UUID transactionId,
+        UUID userId,
         UUID auctionId,
-        UUID freezeTransactionId,
         BigDecimal amount
 ) {
 }

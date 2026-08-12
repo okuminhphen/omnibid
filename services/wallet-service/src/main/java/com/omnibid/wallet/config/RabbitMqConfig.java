@@ -26,11 +26,12 @@ public class RabbitMqConfig {
     @Bean
     Queue refundQueue(
             @Value("${omnibid.rabbitmq.refund-queue}") String queue,
-            @Value("${omnibid.rabbitmq.refund-dlx}") String deadLetterExchange
+            @Value("${omnibid.rabbitmq.refund-dlx}") String deadLetterExchange,
+            @Value("${omnibid.rabbitmq.refund-dead-letter-routing-key}") String deadLetterRoutingKey
     ) {
         return QueueBuilder.durable(queue)
                 .deadLetterExchange(deadLetterExchange)
-                .deadLetterRoutingKey("refund.failed")
+                .deadLetterRoutingKey(deadLetterRoutingKey)
                 .build();
     }
 
@@ -51,11 +52,12 @@ public class RabbitMqConfig {
     @Bean
     Binding refundDeadLetterBinding(
             Queue refundDeadLetterQueue,
-            DirectExchange refundDeadLetterExchange
+            DirectExchange refundDeadLetterExchange,
+            @Value("${omnibid.rabbitmq.refund-dead-letter-routing-key}") String deadLetterRoutingKey
     ) {
         return BindingBuilder.bind(refundDeadLetterQueue)
                 .to(refundDeadLetterExchange)
-                .with("refund.failed");
+                .with(deadLetterRoutingKey);
     }
 
     @Bean

@@ -4,7 +4,7 @@ import com.omnibid.wallet.domain.Wallet;
 import com.omnibid.wallet.domain.WalletTransaction;
 import com.omnibid.wallet.domain.WalletTransactionStatus;
 import com.omnibid.wallet.domain.WalletTransactionType;
-import com.omnibid.wallet.messaging.RefundMessage;
+import com.omnibid.wallet.messaging.RefundCommand;
 import com.omnibid.wallet.repository.WalletRepository;
 import com.omnibid.wallet.repository.WalletTransactionRepository;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -22,37 +23,61 @@ public class RefundService {
     private final WalletTransactionRepository transactionRepository;
 
     @Transactional
-    public void refund(RefundMessage message) {
-        if (message.amount() == null || message.amount().signum() <= 0) {
+    public void refund(RefundCommand command) {
+        if (command.amount() == null || command.amount().signum() <= 0) {
             throw new IllegalArgumentException("Refund amount must be positive");
         }
 
-        Wallet wallet = walletRepository.findByIdForUpdate(message.walletId())
-                .orElseThrow(() -> new NoSuchElementException("Wallet not found: " + message.walletId()));
+        Wallet wallet = walletRepository.findByUserIdForUpdate(command.userId())
+                .orElseThrow(() -> new NoSuchElementException("Wallet not found for user: " + command.userId()));
 
-        String idempotencyKey = "refund:" + message.messageId();
+        String idempotencyKey = "refund:" + command.transactionId();
         WalletTransaction duplicate = transactionRepository.findByIdempotencyKey(idempotencyKey).orElse(null);
         if (duplicate != null) {
             boolean samePayload = duplicate.getType() == WalletTransactionType.REFUND
-                    && duplicate.getWalletId().equals(message.walletId())
-                    && java.util.Objects.equals(duplicate.getAuctionId(), message.auctionId())
-                    && duplicate.getAmount().compareTo(message.amount()) == 0;
+                    && duplicate.getStatus() == WalletTransactionStatus.SUCCESS
+                    && duplicate.getWalletId().equals(wallet.getId())
+                    && Objects.equals(duplicate.getAuctionId(), command.auctionId())
+                    && duplicate.getAmount().compareTo(command.amount()) == 0;
             if (!samePayload) {
-                throw new IllegalArgumentException("Refund messageId was reused with a different payload");
+                throw new IllegalArgumentException("Refund transactionId was reused with a different payload");
             }
             return;
         }
 
-        wallet.refundFrozen(message.amount());
+        WalletTransaction freezeTransaction = transactionRepository.findById(command.transactionId())
+                .orElseThrow(() -> new NoSuchElementException(
+                        "Freeze transaction not found: " + command.transactionId()
+                ));
+        validateFreezeTransaction(freezeTransaction, wallet, command);
+
+        // balance is total owned money. Decreasing frozenBalance restores
+        // availableBalance = balance - frozenBalance without minting money.
+        wallet.refundFrozen(command.amount());
 
         WalletTransaction transaction = new WalletTransaction();
         transaction.setId(UUID.randomUUID());
-        transaction.setWalletId(message.walletId());
-        transaction.setAuctionId(message.auctionId());
-        transaction.setAmount(message.amount());
+        transaction.setWalletId(wallet.getId());
+        transaction.setAuctionId(command.auctionId());
+        transaction.setAmount(command.amount());
         transaction.setType(WalletTransactionType.REFUND);
         transaction.setStatus(WalletTransactionStatus.SUCCESS);
         transaction.setIdempotencyKey(idempotencyKey);
         transactionRepository.save(transaction);
+    }
+
+    private void validateFreezeTransaction(
+            WalletTransaction freezeTransaction,
+            Wallet wallet,
+            RefundCommand command
+    ) {
+        boolean matches = freezeTransaction.getType() == WalletTransactionType.FREEZE
+                && freezeTransaction.getStatus() == WalletTransactionStatus.SUCCESS
+                && freezeTransaction.getWalletId().equals(wallet.getId())
+                && Objects.equals(freezeTransaction.getAuctionId(), command.auctionId())
+                && freezeTransaction.getAmount().compareTo(command.amount()) == 0;
+        if (!matches) {
+            throw new IllegalArgumentException("Refund command does not match the original freeze transaction");
+        }
     }
 }

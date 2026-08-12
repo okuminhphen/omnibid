@@ -1,6 +1,5 @@
 package com.omnibid.auction.service;
 
-import com.omnibid.auction.event.BidPlacedEvent;
 import com.omnibid.auction.exception.BidConcurrencyException;
 import com.omnibid.auction.grpc.WalletClient;
 import com.omnibid.auction.repository.AuctionRepository;
@@ -13,7 +12,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
@@ -39,7 +37,9 @@ class AuctionServiceImplTest {
     @Mock
     private StringRedisTemplate redisTemplate;
     @Mock
-    private KafkaTemplate<String, BidPlacedEvent> kafkaTemplate;
+    private KafkaProducerService kafkaProducerService;
+    @Mock
+    private RabbitMQPublisherService rabbitMQPublisherService;
     @Mock
     private TransactionTemplate transactionTemplate;
     @Mock

@@ -2,6 +2,7 @@ package com.omnibid.auction.controller;
 
 import com.omnibid.auction.dto.AuctionResponse;
 import com.omnibid.auction.dto.BidResponse;
+import com.omnibid.auction.dto.EndAuctionResponse;
 import com.omnibid.auction.dto.PlaceBidRequest;
 import com.omnibid.auction.repository.AuctionRepository;
 import com.omnibid.auction.service.AuctionService;
@@ -53,5 +54,10 @@ public class AuctionController {
                 request.userId(),
                 request.bidAmount()
         );
+    }
+
+    @PostMapping("/{auctionId}/end")
+    public EndAuctionResponse endAuction(@PathVariable UUID auctionId) {
+        return auctionService.endAuction(auctionId);
     }
 }

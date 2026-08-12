@@ -28,7 +28,8 @@ flowchart LR
     Auction -->|"BidPlacedEvent"| Kafka
     Kafka --> Audit
     Audit --> Mongo
-    Rabbit -->|"refund-queue"| Wallet
+    Auction -->|"RefundCommand"| Rabbit
+    Rabbit -->|"wallet.refund.queue"| Wallet
     Auction -. "future: object media" .-> S3
 ```
 
@@ -58,7 +59,29 @@ sequenceDiagram
     A-->>UI: BidResponse
     A->>K: BidPlacedEvent
     K->>AU: consume event
-    AU->>M: insert bid_logs by eventId
+    AU->>M: insert bid_logs by bidId
+```
+
+Luồng kết thúc phiên và hoàn cọc:
+
+```mermaid
+sequenceDiagram
+    participant C as Postman / Scheduler
+    participant A as Auction Service
+    participant DB as PostgreSQL
+    participant Q as RabbitMQ
+    participant R as Redis
+    participant W as Wallet Service
+
+    C->>A: POST /api/v1/auctions/{id}/end
+    A->>DB: mark ENDED + find losing users
+    loop each losing user
+        A->>Q: RefundCommand(transactionId, userId, auctionId, amount)
+    end
+    Q->>W: wallet.refund.queue
+    W->>R: SETNX idempotent:refund:{transactionId}
+    W->>DB: SELECT wallet FOR UPDATE + insert REFUND
+    W->>R: set SUCCESS
 ```
 
 ## Tech stack
@@ -180,7 +203,8 @@ Mở `http://localhost:3000`. Frontend refresh dữ liệu mỗi hai giây để
 Project seed sẵn:
 
 - Auction ID: `11111111-1111-1111-1111-111111111111`.
-- Bidder/wallet ID: `22222222-2222-2222-2222-222222222222`.
+- Phase 2 auction ID: `44444444-4444-4444-4444-444444444444`.
+- Bidder/wallet IDs: `22222222-2222-2222-2222-222222222222` và `33333333-3333-3333-3333-333333333333`.
 - Số dư ví ban đầu: `1,000,000.00`.
 
 Đặt một bid bằng PowerShell:
@@ -200,21 +224,69 @@ Invoke-RestMethod `
 
 Wallet dùng khóa idempotency `deposit:{auctionId}:{userId}`, vì vậy cùng một user đặt nhiều bid trong một phiên chỉ bị freeze deposit một lần.
 
-### Refund message mẫu
+### Test PHASE 2 bằng Postman
 
-Publish JSON sau vào exchange `refund-exchange`, routing key `refund.requested` qua RabbitMQ management UI:
+Nếu đang chạy các app container theo hướng dẫn của Codex, dùng `baseUrl = http://localhost:18080`. Nếu chạy `auction-service` trực tiếp bằng Maven, dùng port `8080`.
 
-```json
+Tạo Postman environment:
+
+```text
+baseUrl    = http://localhost:18080
+auctionId  = 44444444-4444-4444-4444-444444444444
+loserId    = 33333333-3333-3333-3333-333333333333
+winnerId   = 22222222-2222-2222-2222-222222222222
+```
+
+1. Bid `110.00` cho user sẽ thua:
+
+```http
+POST {{baseUrl}}/api/v1/auctions/{{auctionId}}/bid
+Content-Type: application/json
+
 {
-  "messageId": "refund-demo-001",
-  "walletId": "22222222-2222-2222-2222-222222222222",
-  "auctionId": "11111111-1111-1111-1111-111111111111",
-  "freezeTransactionId": "REPLACE_WITH_FREEZE_TRANSACTION_ID",
-  "amount": 150.00
+  "userId": "{{loserId}}",
+  "bidAmount": 110.00
 }
 ```
 
-Consumer đặt Redis key `idempotent:refund:refund-demo-001`. PostgreSQL còn có unique `request_id=refund:refund-demo-001`, vì Redis TTL hoặc mất dữ liệu không được phép dẫn tới hoàn tiền lần hai.
+2. Bid `120.00` cho user thắng:
+
+```http
+POST {{baseUrl}}/api/v1/auctions/{{auctionId}}/bid
+Content-Type: application/json
+
+{
+  "userId": "{{winnerId}}",
+  "bidAmount": 120.00
+}
+```
+
+3. Kết thúc phiên:
+
+```http
+POST {{baseUrl}}/api/v1/auctions/{{auctionId}}/end
+```
+
+Response trả `status = ENDED`, `winningUserId` và `refundCommandsPublished`. Gọi lại endpoint này là an toàn: command dùng cùng `transactionId`, Redis và unique index PostgreSQL sẽ chặn refund trùng.
+
+4. Kiểm tra audit log trong MongoDB:
+
+```powershell
+docker exec omnibid-mongodb mongosh omnibid_audit --quiet --eval `
+  'printjson(db.bid_logs.find().sort({timestamp:-1}).limit(10).toArray())'
+```
+
+5. Kiểm tra ví và durable refund transaction trong PostgreSQL:
+
+```powershell
+docker exec omnibid-postgres psql -U omnibid -d wallet_db -c `
+  "select user_id, balance, frozen_balance, balance-frozen_balance as available_balance from wallets order by user_id;"
+
+docker exec omnibid-postgres psql -U omnibid -d wallet_db -c `
+  "select wallet_id, auction_id, amount, type, status, idempotency_key from wallet_transactions order by created_at desc;"
+```
+
+Sau refund, `balance` tổng không đổi; `frozen_balance` của bidder thua giảm và `available_balance` tăng lại. Kiểm tra RabbitMQ tại `http://localhost:15672`: queue chính là `wallet.refund.queue`, queue lỗi là `wallet.refund.dlq`.
 
 ## Các invariant và quyết định thiết kế
 
@@ -224,7 +296,8 @@ Consumer đặt Redis key `idempotent:refund:refund-demo-001`. PostgreSQL còn c
 4. Wallet dùng `SELECT ... FOR UPDATE` và transaction để serialize thay đổi số dư. Tiền dùng `BigDecimal`/PostgreSQL `NUMERIC`, không dùng floating point.
 5. gRPC `idempotency_key` được lưu unique ở `wallet_transactions`; deposit chỉ active một lần cho mỗi user/auction.
 6. Refund có fast dedupe bằng Redis `SETNX` và durable dedupe trong PostgreSQL.
-7. Audit consumer dùng Kafka `eventId` làm Mongo `_id`, vì vậy event redelivery không tạo log trùng.
+7. Audit consumer dùng Kafka `bidId` làm Mongo `_id`, vì vậy event redelivery không tạo log trùng.
+8. Endpoint `/end` có thể gọi lại để republish command sau lỗi mạng; wallet dedupe theo freeze `transactionId` ở cả Redis và PostgreSQL.
 
 ### Giới hạn có chủ đích của boilerplate
 

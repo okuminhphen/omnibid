@@ -11,20 +11,18 @@ spring:
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
-      group-id: ${AUDIT_CONSUMER_GROUP:audit-service}
+      group-id: ${AUDIT_CONSUMER_GROUP:audit-group}
       auto-offset-reset: earliest
       enable-auto-commit: false
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: com.omnibid.audit.messaging
-        spring.json.value.default.type: com.omnibid.audit.messaging.BidPlacedEvent
     listener:
       ack-mode: record
 
 omnibid:
   kafka:
     bid-topic: ${BID_TOPIC:bid-events}
+    consumer-group: ${AUDIT_CONSUMER_GROUP:audit-group}
 
 management:
   endpoints:

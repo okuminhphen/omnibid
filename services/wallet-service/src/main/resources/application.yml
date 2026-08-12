@@ -47,8 +47,9 @@ management:
 
 omnibid:
   rabbitmq:
-    refund-exchange: refund-exchange
-    refund-routing-key: refund.requested
-    refund-queue: refund-queue
-    refund-dlx: refund-dlx
-    refund-dlq: refund-dlq
+    refund-exchange: ${REFUND_EXCHANGE:auction.exchange}
+    refund-routing-key: ${REFUND_ROUTING_KEY:auction.refund}
+    refund-queue: ${REFUND_QUEUE:wallet.refund.queue}
+    refund-dlx: ${REFUND_DLX:auction.refund.dlx}
+    refund-dlq: ${REFUND_DLQ:wallet.refund.dlq}
+    refund-dead-letter-routing-key: ${REFUND_DLQ_ROUTING_KEY:auction.refund.failed}

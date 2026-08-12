@@ -29,6 +29,13 @@ spring:
       properties:
         enable.idempotence: true
         spring.json.add.type.headers: false
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_DEFAULT_USER:omnibid}
+    password: ${RABBITMQ_DEFAULT_PASS:omnibid}
+    publisher-confirm-type: correlated
+    publisher-returns: true
 
 grpc:
   client:
@@ -45,3 +52,6 @@ management:
 omnibid:
   kafka:
     bid-topic: ${BID_TOPIC:bid-events}
+  rabbitmq:
+    refund-exchange: ${REFUND_EXCHANGE:auction.exchange}
+    refund-routing-key: ${REFUND_ROUTING_KEY:auction.refund}

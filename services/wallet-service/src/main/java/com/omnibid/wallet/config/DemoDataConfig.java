@@ -13,19 +13,26 @@ import java.util.UUID;
 public class DemoDataConfig {
 
     public static final UUID DEMO_BIDDER_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
+    public static final UUID DEMO_BIDDER_2_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
 
     @Bean
     CommandLineRunner seedWallet(WalletRepository repository) {
         return args -> {
-            Wallet wallet = repository.findById(DEMO_BIDDER_ID).orElseGet(() -> {
-                Wallet created = new Wallet();
-                created.setId(DEMO_BIDDER_ID);
-                created.setBalance(new BigDecimal("1000000.00"));
-                created.setFrozenBalance(BigDecimal.ZERO.setScale(2));
-                return created;
-            });
-            wallet.setUserId(DEMO_BIDDER_ID);
-            repository.save(wallet);
+            seedWallet(repository, DEMO_BIDDER_ID);
+            seedWallet(repository, DEMO_BIDDER_2_ID);
         };
+    }
+
+    private void seedWallet(WalletRepository repository, UUID userId) {
+        if (repository.existsById(userId)) {
+            return;
+        }
+
+        Wallet wallet = new Wallet();
+        wallet.setId(userId);
+        wallet.setUserId(userId);
+        wallet.setBalance(new BigDecimal("1000000.00"));
+        wallet.setFrozenBalance(BigDecimal.ZERO.setScale(2));
+        repository.save(wallet);
     }
 }
