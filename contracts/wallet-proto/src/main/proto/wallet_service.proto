@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package omnibid.wallet.v1;
+
+option java_multiple_files = true;
+option java_package = "com.omnibid.contract.wallet.v1";
+option java_outer_classname = "WalletServiceProto";
+
+service WalletService {
+  rpc FreezeDeposit(FreezeRequest) returns (FreezeResponse);
+}
+
+message FreezeRequest {
+  string request_id = 1;
+  string auction_id = 2;
+  string bidder_id = 3;
+  string bid_id = 4;
+  string amount = 5;
+}
+
+message FreezeResponse {
+  bool success = 1;
+  string transaction_id = 2;
+  string error_code = 3;
+  string message = 4;
+}

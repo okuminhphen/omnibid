@@ -1,0 +1,49 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: auction-service
+  datasource:
+    url: ${AUCTION_DB_URL:jdbc:postgresql://localhost:5432/auction_db}
+    username: ${POSTGRES_USER:omnibid}
+    password: ${POSTGRES_PASSWORD:omnibid}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+        spring.json.add.type.headers: false
+
+grpc:
+  client:
+    wallet-service:
+      address: ${WALLET_GRPC_TARGET:static://localhost:9091}
+      negotiation-type: plaintext
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+omnibid:
+  kafka:
+    bid-topic: ${BID_TOPIC:bid-events}
+  lock:
+    wait-seconds: ${AUCTION_LOCK_WAIT_SECONDS:2}
