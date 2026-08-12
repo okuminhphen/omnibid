@@ -21,8 +21,8 @@ export function BidPanel({ auctionId, currentPrice, onPlaced }: {
     setMessage("");
     try {
       const bid = await placeBid(auctionId, {
-        bidderId: DEMO_BIDDER_ID,
-        amount: Number(amount)
+        userId: DEMO_BIDDER_ID,
+        bidAmount: Number(amount)
       });
       setMessage(`Bid accepted: ${bid.bidId}`);
       onPlaced();

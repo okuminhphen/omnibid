@@ -45,5 +45,3 @@ management:
 omnibid:
   kafka:
     bid-topic: ${BID_TOPIC:bid-events}
-  lock:
-    wait-seconds: ${AUCTION_LOCK_WAIT_SECONDS:2}

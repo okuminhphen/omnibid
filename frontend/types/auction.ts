@@ -11,8 +11,8 @@ export interface Auction {
 }
 
 export interface PlaceBidPayload {
-  bidderId: string;
-  amount: number;
+  userId: string;
+  bidAmount: number;
 }
 
 export interface BidResponse {

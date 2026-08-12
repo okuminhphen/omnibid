@@ -20,15 +20,19 @@ public class DemoDataConfig {
     @Bean
     CommandLineRunner seedAuction(AuctionRepository repository) {
         return args -> {
-            if (repository.existsById(DEMO_AUCTION_ID)) {
-                return;
-            }
-            Auction auction = new Auction();
-            auction.setId(DEMO_AUCTION_ID);
+            Auction auction = repository.findById(DEMO_AUCTION_ID).orElseGet(() -> {
+                Auction created = new Auction();
+                created.setId(DEMO_AUCTION_ID);
+                created.setCurrentPrice(new BigDecimal("100.00"));
+                return created;
+            });
             auction.setTitle("Mechanical Keyboard - Founder's Edition");
             auction.setStatus(AuctionStatus.ACTIVE);
-            auction.setCurrentPrice(new BigDecimal("100.00"));
-            auction.setEndsAt(Instant.now().plus(30, ChronoUnit.DAYS));
+            auction.setStartingPrice(new BigDecimal("100.00"));
+            auction.setStepPrice(new BigDecimal("10.00"));
+            auction.setDepositAmount(new BigDecimal("100.00"));
+            auction.setStartTime(Instant.now().minus(1, ChronoUnit.DAYS));
+            auction.setEndTime(Instant.now().plus(30, ChronoUnit.DAYS));
             repository.save(auction);
         };
     }

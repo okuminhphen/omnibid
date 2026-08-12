@@ -22,9 +22,9 @@ public class GlobalExceptionHandler {
         return response(HttpStatus.UNPROCESSABLE_ENTITY, "BID_REJECTED", exception.getMessage());
     }
 
-    @ExceptionHandler(LockUnavailableException.class)
-    ResponseEntity<ApiError> handleBusy(LockUnavailableException exception) {
-        return response(HttpStatus.CONFLICT, "AUCTION_BUSY", exception.getMessage());
+    @ExceptionHandler(BidConcurrencyException.class)
+    ResponseEntity<ApiError> handleBusy(BidConcurrencyException exception) {
+        return response(HttpStatus.CONFLICT, "BID_CONCURRENCY_CONFLICT", exception.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

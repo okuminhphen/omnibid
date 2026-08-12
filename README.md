@@ -19,7 +19,7 @@ flowchart LR
     Mongo[("MongoDB")]
     S3[("LocalStack S3")]
 
-    Browser -->|"REST + X-Idempotency-Key"| Auction
+    Browser -->|"REST place bid"| Auction
     Auction -->|"RLock lock:auction:{id}"| Redis
     Auction -->|"JPA"| PG
     Auction -->|"FreezeDeposit gRPC"| Wallet
@@ -45,11 +45,11 @@ sequenceDiagram
     participant AU as Audit Service
     participant M as MongoDB
 
-    UI->>A: POST /bids + X-Idempotency-Key
+    UI->>A: POST /bid (userId, bidAmount)
     A->>R: tryLock(lock:auction:{id})
     R-->>A: lock acquired
-    A->>DB: re-check idempotency + current price
-    A->>W: FreezeDeposit(request_id, bidder, amount)
+    A->>DB: validate ACTIVE + currentPrice + stepPrice
+    A->>W: FreezeDeposit(idempotencyKey, userId, depositAmount)
     W->>DB: SELECT wallet FOR UPDATE
     W->>DB: update balances + unique wallet transaction
     W-->>A: transaction_id
@@ -186,22 +186,19 @@ Project seed sẵn:
 Đặt một bid bằng PowerShell:
 
 ```powershell
-$idempotencyKey = [guid]::NewGuid().ToString()
-$headers = @{ "X-Idempotency-Key" = $idempotencyKey }
 $body = @{
-  bidderId = "22222222-2222-2222-2222-222222222222"
-  amount = 150.00
+  userId = "22222222-2222-2222-2222-222222222222"
+  bidAmount = 180.00
 } | ConvertTo-Json
 
 Invoke-RestMethod `
   -Method Post `
-  -Uri "http://localhost:8080/api/v1/auctions/11111111-1111-1111-1111-111111111111/bids" `
-  -Headers $headers `
+  -Uri "http://localhost:8080/api/v1/auctions/11111111-1111-1111-1111-111111111111/bid" `
   -ContentType "application/json" `
   -Body $body
 ```
 
-Gửi lại chính request với cùng `$idempotencyKey` sẽ trả lại bid cũ và không khóa tiền lần hai.
+Wallet dùng khóa idempotency `deposit:{auctionId}:{userId}`, vì vậy cùng một user đặt nhiều bid trong một phiên chỉ bị freeze deposit một lần.
 
 ### Refund message mẫu
 
@@ -223,9 +220,9 @@ Consumer đặt Redis key `idempotent:refund:refund-demo-001`. PostgreSQL còn c
 
 1. Mỗi auction chỉ có một bid được đánh giá tại một thời điểm trên toàn cluster nhờ `lock:auction:{auctionId}`.
 2. Giá hiện tại luôn được đọc lại sau khi lấy lock; kiểm tra trước lock không đủ để chống race condition.
-3. Redisson watchdog gia hạn lock trong lúc owner còn sống; `finally` chỉ unlock nếu current thread vẫn sở hữu lock.
+3. Lock có wait time 3 giây và lease time 5 giây; `finally` chỉ unlock nếu current thread vẫn sở hữu lock.
 4. Wallet dùng `SELECT ... FOR UPDATE` và transaction để serialize thay đổi số dư. Tiền dùng `BigDecimal`/PostgreSQL `NUMERIC`, không dùng floating point.
-5. HTTP idempotency key được lưu unique ở `bids`; gRPC `request_id` được lưu unique ở `wallet_transactions`.
+5. gRPC `idempotency_key` được lưu unique ở `wallet_transactions`; deposit chỉ active một lần cho mỗi user/auction.
 6. Refund có fast dedupe bằng Redis `SETNX` và durable dedupe trong PostgreSQL.
 7. Audit consumer dùng Kafka `eventId` làm Mongo `_id`, vì vậy event redelivery không tạo log trùng.
 

@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,7 +30,7 @@ public class AuctionController {
 
     @GetMapping
     public List<AuctionResponse> list() {
-        return auctionRepository.findAllByOrderByEndsAtAsc().stream()
+        return auctionRepository.findAllByOrderByEndTimeAsc().stream()
                 .map(AuctionResponse::from)
                 .toList();
     }
@@ -43,13 +42,16 @@ public class AuctionController {
                 .orElseThrow(() -> new NoSuchElementException("Auction not found: " + auctionId));
     }
 
-    @PostMapping("/{auctionId}/bids")
+    @PostMapping({"/{auctionId}/bid", "/{auctionId}/bids"})
     @ResponseStatus(HttpStatus.CREATED)
     public BidResponse placeBid(
             @PathVariable UUID auctionId,
-            @RequestHeader("X-Idempotency-Key") String idempotencyKey,
             @Valid @RequestBody PlaceBidRequest request
     ) {
-        return auctionService.placeBid(auctionId, request, idempotencyKey);
+        return auctionService.placeBid(
+                auctionId,
+                request.userId(),
+                request.bidAmount()
+        );
     }
 }

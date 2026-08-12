@@ -17,13 +17,14 @@ public class DemoDataConfig {
     @Bean
     CommandLineRunner seedWallet(WalletRepository repository) {
         return args -> {
-            if (repository.existsById(DEMO_BIDDER_ID)) {
-                return;
-            }
-            Wallet wallet = new Wallet();
-            wallet.setId(DEMO_BIDDER_ID);
-            wallet.setAvailableBalance(new BigDecimal("1000000.00"));
-            wallet.setFrozenBalance(BigDecimal.ZERO.setScale(2));
+            Wallet wallet = repository.findById(DEMO_BIDDER_ID).orElseGet(() -> {
+                Wallet created = new Wallet();
+                created.setId(DEMO_BIDDER_ID);
+                created.setBalance(new BigDecimal("1000000.00"));
+                created.setFrozenBalance(BigDecimal.ZERO.setScale(2));
+                return created;
+            });
+            wallet.setUserId(DEMO_BIDDER_ID);
             repository.save(wallet);
         };
     }

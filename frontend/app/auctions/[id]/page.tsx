@@ -1,23 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import { BidPanel } from "@/components/BidPanel";
 import { getAuction } from "@/services/api";
 import type { Auction } from "@/types/auction";
 
-export default function AuctionDetailPage({ params }: { params: { id: string } }) {
+export default function AuctionDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const [auction, setAuction] = useState<Auction | null>(null);
   const [error, setError] = useState("");
 
   const refresh = useCallback(async () => {
     try {
-      setAuction(await getAuction(params.id));
+      setAuction(await getAuction(id));
       setError("");
     } catch {
       setError("Không tải được phiên đấu giá.");
     }
-  }, [params.id]);
+  }, [id]);
 
   useEffect(() => {
     void refresh();

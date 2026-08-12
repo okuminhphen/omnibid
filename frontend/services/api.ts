@@ -24,7 +24,7 @@ export async function placeBid(id: string, payload: PlaceBidPayload): Promise<Bi
   // the key; production clients normally persist it until a terminal response.
   const idempotencyKey = crypto.randomUUID();
   const response = await api.post<BidResponse>(
-    `/api/v1/auctions/${id}/bids`,
+    `/api/v1/auctions/${id}/bid`,
     payload,
     { headers: { "X-Idempotency-Key": idempotencyKey } }
   );

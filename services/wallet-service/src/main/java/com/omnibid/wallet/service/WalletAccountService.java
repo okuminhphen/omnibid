@@ -2,6 +2,7 @@ package com.omnibid.wallet.service;
 
 import com.omnibid.wallet.domain.Wallet;
 import com.omnibid.wallet.domain.WalletTransaction;
+import com.omnibid.wallet.domain.WalletTransactionStatus;
 import com.omnibid.wallet.domain.WalletTransactionType;
 import com.omnibid.wallet.repository.WalletRepository;
 import com.omnibid.wallet.repository.WalletTransactionRepository;
@@ -10,7 +11,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
@@ -23,42 +23,58 @@ public class WalletAccountService {
 
     @Transactional
     public FreezeResult freezeDeposit(
-            String requestId,
+            String idempotencyKey,
+            UUID userId,
             UUID auctionId,
-            UUID bidderId,
-            UUID bidId,
             BigDecimal amount
     ) {
-        if (amount.signum() <= 0) {
+        if (amount == null || amount.signum() <= 0) {
             return FreezeResult.rejected("INVALID_AMOUNT", "Amount must be positive");
         }
 
-        // Serialize balance changes in PostgreSQL even if multiple gRPC workers race.
-        Wallet wallet = walletRepository.findByIdForUpdate(bidderId)
-                .orElseThrow(() -> new NoSuchElementException("Wallet not found: " + bidderId));
+        // The row lock is the durable concurrency boundary for wallet balances.
+        Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
+                .orElseThrow(() -> new NoSuchElementException("Wallet not found for user: " + userId));
 
-        WalletTransaction duplicate = transactionRepository.findByRequestId(requestId).orElse(null);
+        WalletTransaction duplicate = transactionRepository.findByIdempotencyKey(idempotencyKey).orElse(null);
         if (duplicate != null) {
-            verifySameFreezeRequest(duplicate, auctionId, bidderId, bidId, amount);
+            verifySameFreezeRequest(duplicate, wallet.getId(), auctionId, amount);
             return FreezeResult.success(duplicate.getId());
         }
 
-        if (wallet.getAvailableBalance().compareTo(amount) < 0) {
+        // A user deposits only once per auction, even if a later bid carries a new key.
+        WalletTransaction latestAuctionTransaction = transactionRepository
+                .findFirstByWalletIdAndAuctionIdAndStatusOrderByCreatedAtDesc(
+                        wallet.getId(),
+                        auctionId,
+                        WalletTransactionStatus.SUCCESS
+                )
+                .orElse(null);
+        if (latestAuctionTransaction != null
+                && latestAuctionTransaction.getType() == WalletTransactionType.FREEZE) {
+            if (latestAuctionTransaction.getAmount().compareTo(amount) != 0) {
+                return FreezeResult.rejected(
+                        "DEPOSIT_AMOUNT_CONFLICT",
+                        "A different deposit amount was already frozen for this auction"
+                );
+            }
+            return FreezeResult.success(latestAuctionTransaction.getId());
+        }
+
+        if (!wallet.hasEnoughAvailableBalance(amount)) {
             return FreezeResult.rejected("INSUFFICIENT_FUNDS", "Available balance is too low");
         }
 
-        wallet.setAvailableBalance(wallet.getAvailableBalance().subtract(amount));
-        wallet.setFrozenBalance(wallet.getFrozenBalance().add(amount));
+        wallet.freeze(amount);
 
         WalletTransaction transaction = new WalletTransaction();
         transaction.setId(UUID.randomUUID());
-        transaction.setRequestId(requestId);
-        transaction.setWalletId(bidderId);
+        transaction.setWalletId(wallet.getId());
         transaction.setAuctionId(auctionId);
-        transaction.setBidId(bidId);
         transaction.setAmount(amount);
         transaction.setType(WalletTransactionType.FREEZE);
-        transaction.setCreatedAt(Instant.now());
+        transaction.setStatus(WalletTransactionStatus.SUCCESS);
+        transaction.setIdempotencyKey(idempotencyKey);
         transactionRepository.save(transaction);
 
         return FreezeResult.success(transaction.getId());
@@ -66,15 +82,14 @@ public class WalletAccountService {
 
     private void verifySameFreezeRequest(
             WalletTransaction transaction,
+            UUID walletId,
             UUID auctionId,
-            UUID bidderId,
-            UUID bidId,
             BigDecimal amount
     ) {
         boolean samePayload = transaction.getType() == WalletTransactionType.FREEZE
-                && transaction.getWalletId().equals(bidderId)
+                && transaction.getStatus() == WalletTransactionStatus.SUCCESS
+                && transaction.getWalletId().equals(walletId)
                 && transaction.getAuctionId().equals(auctionId)
-                && transaction.getBidId().equals(bidId)
                 && transaction.getAmount().compareTo(amount) == 0;
         if (!samePayload) {
             throw new IllegalArgumentException("Idempotency key was already used with a different payload");

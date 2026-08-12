@@ -40,7 +40,7 @@ public class RefundConsumer {
         }
 
         try {
-            // The DB transaction also has a unique request_id as a second safety net
+            // The DB transaction also has a unique idempotency_key as a second safety net
             // if Redis loses data or the marker expires after a process crash.
             refundService.refund(message);
             redisTemplate.opsForValue().set(key, "COMPLETED", COMPLETED_TTL);
