@@ -48,8 +48,13 @@ public class AuctionServiceImpl implements AuctionService {
     private final TransactionTemplate transactionTemplate;
 
     @Override
-    public BidResponse placeBid(UUID auctionId, UUID userId, BigDecimal bidAmount) {
-        validateInput(auctionId, userId, bidAmount);
+    public BidResponse placeBid(
+            UUID auctionId,
+            UUID userId,
+            BigDecimal bidAmount,
+            String idempotencyKey
+    ) {
+        validateInput(auctionId, userId, bidAmount, idempotencyKey);
 
         String lockKey = "lock:auction:" + auctionId;
         RLock lock = redissonClient.getLock(lockKey);
@@ -70,7 +75,8 @@ public class AuctionServiceImpl implements AuctionService {
                         transactionTemplate.execute(status -> placeBidInTransaction(
                                 auctionId,
                                 userId,
-                                bidAmount
+                                bidAmount,
+                                idempotencyKey
                         ))
                 );
             } catch (OptimisticLockingFailureException exception) {
@@ -81,9 +87,11 @@ public class AuctionServiceImpl implements AuctionService {
                 );
             }
 
-            String priceCacheKey = "cache:auction:" + auctionId + ":price";
-            redisTemplate.opsForValue().set(priceCacheKey, bidAmount.toPlainString());
-            kafkaProducerService.sendBidEvent(result.event());
+            if (result.event() != null) {
+                String priceCacheKey = "cache:auction:" + auctionId + ":price";
+                redisTemplate.opsForValue().set(priceCacheKey, bidAmount.toPlainString());
+                kafkaProducerService.sendBidEvent(result.event());
+            }
 
             return result.response();
         } catch (InterruptedException exception) {
@@ -147,8 +155,15 @@ public class AuctionServiceImpl implements AuctionService {
     private PlacementResult placeBidInTransaction(
             UUID auctionId,
             UUID userId,
-            BigDecimal bidAmount
+            BigDecimal bidAmount,
+            String idempotencyKey
     ) {
+        Bid duplicate = bidRepository.findByIdempotencyKey(idempotencyKey).orElse(null);
+        if (duplicate != null) {
+            validateDuplicateBid(duplicate, auctionId, userId, bidAmount);
+            return new PlacementResult(toResponse(duplicate), null);
+        }
+
         Auction auction = auctionRepository.findById(auctionId)
                 .orElseThrow(() -> new NoSuchElementException("Auction not found: " + auctionId));
 
@@ -192,7 +207,7 @@ public class AuctionServiceImpl implements AuctionService {
         bid.setAuctionId(auctionId);
         bid.setBidderId(userId);
         bid.setAmount(bidAmount);
-        bid.setIdempotencyKey("bid:" + bidId);
+        bid.setIdempotencyKey(idempotencyKey);
         bid.setWalletTransactionId(walletTransactionId);
         bid.setPlacedAt(now);
         bidRepository.save(bid);
@@ -243,24 +258,39 @@ public class AuctionServiceImpl implements AuctionService {
         );
     }
 
-    private void validateInput(UUID auctionId, UUID userId, BigDecimal bidAmount) {
+    private void validateInput(
+            UUID auctionId,
+            UUID userId,
+            BigDecimal bidAmount,
+            String idempotencyKey
+    ) {
         if (auctionId == null || userId == null) {
             throw new IllegalArgumentException("auctionId và userId là bắt buộc");
         }
         if (bidAmount == null || bidAmount.signum() <= 0) {
             throw new IllegalArgumentException("bidAmount phải lớn hơn 0");
         }
+        if (idempotencyKey == null || idempotencyKey.isBlank() || idempotencyKey.length() > 100) {
+            throw new IllegalArgumentException("X-Idempotency-Key phải có từ 1 đến 100 ký tự");
+        }
+    }
+
+    private void validateDuplicateBid(
+            Bid duplicate,
+            UUID auctionId,
+            UUID userId,
+            BigDecimal bidAmount
+    ) {
+        boolean sameRequest = duplicate.getAuctionId().equals(auctionId)
+                && duplicate.getBidderId().equals(userId)
+                && duplicate.getAmount().compareTo(bidAmount) == 0;
+        if (!sameRequest) {
+            throw new DomainException("X-Idempotency-Key đã được dùng cho một lượt đặt giá khác");
+        }
     }
 
     private BidResponse toResponse(Bid bid) {
-        return new BidResponse(
-                bid.getId(),
-                bid.getAuctionId(),
-                bid.getBidderId(),
-                bid.getAmount(),
-                bid.getWalletTransactionId(),
-                bid.getPlacedAt()
-        );
+        return BidResponse.from(bid);
     }
 
     private record PlacementResult(BidResponse response, BidPlacedEvent event) {

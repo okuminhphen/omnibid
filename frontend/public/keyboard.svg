@@ -1,0 +1,23 @@
+<svg width="1200" height="900" viewBox="0 0 1200 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="900" rx="48" fill="#F1F5F9"/>
+  <circle cx="172" cy="150" r="260" fill="#FED7AA" fill-opacity=".65"/>
+  <circle cx="1064" cy="760" r="330" fill="#E2E8F0"/>
+  <g filter="url(#shadow)" transform="translate(105 250) rotate(-5 495 195)">
+    <rect width="990" height="390" rx="44" fill="#111827"/>
+    <rect x="20" y="20" width="950" height="350" rx="32" fill="url(#body)" stroke="#334155" stroke-width="3"/>
+    <g fill="#334155" stroke="#475569" stroke-width="2">
+      <path d="M55 56h70v58H55z"/><path d="M137 56h70v58h-70z"/><path d="M219 56h70v58h-70z"/><path d="M301 56h70v58h-70z"/><path d="M383 56h70v58h-70z"/><path d="M465 56h70v58h-70z"/><path d="M547 56h70v58h-70z"/><path d="M629 56h70v58h-70z"/><path d="M711 56h70v58h-70z"/><path d="M793 56h70v58h-70z"/><path d="M875 56h60v58h-60z"/>
+      <path d="M55 126h82v58H55z"/><path d="M149 126h70v58h-70z"/><path d="M231 126h70v58h-70z"/><path d="M313 126h70v58h-70z"/><path d="M395 126h70v58h-70z"/><path d="M477 126h70v58h-70z"/><path d="M559 126h70v58h-70z"/><path d="M641 126h70v58h-70z"/><path d="M723 126h70v58h-70z"/><path d="M805 126h130v58H805z"/>
+      <path d="M55 196h105v58H55z"/><path d="M172 196h70v58h-70z"/><path d="M254 196h70v58h-70z"/><path d="M336 196h70v58h-70z"/><path d="M418 196h70v58h-70z"/><path d="M500 196h70v58h-70z"/><path d="M582 196h70v58h-70z"/><path d="M664 196h70v58h-70z"/><path d="M746 196h70v58h-70z"/><path d="M828 196h107v58H828z"/>
+      <path d="M55 266h130v58H55z"/><path d="M197 266h70v58h-70z"/><path d="M279 266h70v58h-70z"/><path d="M361 266h70v58h-70z"/><path d="M443 266h275v58H443z"/><path d="M730 266h70v58h-70z"/><path d="M812 266h123v58H812z"/>
+    </g>
+    <g fill="#F97316">
+      <rect x="383" y="56" width="70" height="58" rx="3"/><rect x="477" y="126" width="70" height="58" rx="3"/><rect x="582" y="196" width="70" height="58" rx="3"/>
+    </g>
+  </g>
+  <text x="88" y="790" fill="#0F172A" font-family="Arial, sans-serif" font-weight="700" font-size="36" letter-spacing="8">FOUNDER'S EDITION</text>
+  <defs>
+    <linearGradient id="body" x1="495" y1="20" x2="495" y2="370" gradientUnits="userSpaceOnUse"><stop stop-color="#1E293B"/><stop offset="1" stop-color="#0F172A"/></linearGradient>
+    <filter id="shadow" x="-100" y="-100" width="1390" height="790" filterUnits="userSpaceOnUse"><feDropShadow dx="0" dy="40" stdDeviation="45" flood-color="#0F172A" flood-opacity=".28"/></filter>
+  </defs>
+</svg>

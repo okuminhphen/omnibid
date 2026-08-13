@@ -10,7 +10,7 @@ OmniBid là monorepo thực hành xây dựng sàn đấu giá gần real-time, 
 flowchart LR
     Browser["Next.js client"]
     Auction["Auction Service<br/>Spring Boot :8080"]
-    Wallet["Wallet Service<br/>gRPC :9091"]
+    Wallet["Wallet Service<br/>REST :8081 / gRPC :9091"]
     Audit["Audit Service<br/>Spring Boot :8082"]
     PG[("PostgreSQL")]
     Redis[("Redis")]
@@ -19,7 +19,8 @@ flowchart LR
     Mongo[("MongoDB")]
     S3[("LocalStack S3")]
 
-    Browser -->|"REST place bid"| Auction
+    Browser -->|"REST place bid + bid history"| Auction
+    Browser -->|"REST wallet + demo top-up"| Wallet
     Auction -->|"RLock lock:auction:{id}"| Redis
     Auction -->|"JPA"| PG
     Auction -->|"FreezeDeposit gRPC"| Wallet
@@ -103,7 +104,7 @@ OmniBid/
 │   ├── auction-service/          # bid command + Redisson distributed lock
 │   ├── wallet-service/           # freeze/refund + transactional balance
 │   └── audit-service/            # Kafka -> MongoDB bid_logs
-├── frontend/                     # Next.js App Router client
+├── frontend/src/                 # Next.js App Router client, services, types, UI
 ├── infrastructure/postgres/      # tạo auction_db và wallet_db
 ├── docker-compose.yml
 ├── pom.xml                       # Maven reactor/aggregator
@@ -196,7 +197,23 @@ npm.cmd install
 npm.cmd run dev
 ```
 
-Mở `http://localhost:3000`. Frontend refresh dữ liệu mỗi hai giây để tạo trải nghiệm gần real-time; có thể thay polling bằng SSE/WebSocket trong phase tiếp theo.
+Mở `http://localhost:3000`. Trang chi tiết refresh auction và bid history mỗi `1.5` giây; trang danh sách và wallet refresh mỗi `3` giây. Có thể thay polling bằng SSE/WebSocket trong phase tiếp theo.
+
+Các biến frontend mặc định khi chạy service trực tiếp bằng Maven:
+
+```dotenv
+NEXT_PUBLIC_AUCTION_API_URL=http://localhost:8080
+NEXT_PUBLIC_WALLET_API_URL=http://localhost:8081
+```
+
+Nếu dùng các app container local của project, đặt lần lượt là `http://localhost:28080` và `http://localhost:28081`.
+
+Frontend Phase 3 gồm:
+
+- `src/services/api.ts`: hai Axios instance và interceptor tự sinh `X-Idempotency-Key` cho bid/payment/top-up.
+- `src/services/auctionService.ts`: list/detail/place bid/bid history.
+- `/auctions/{id}`: countdown, giá real-time, bid form, anonymous history.
+- `/wallet`: available/frozen balance và top-up demo idempotent.
 
 ## API demo
 
@@ -218,20 +235,29 @@ $body = @{
 Invoke-RestMethod `
   -Method Post `
   -Uri "http://localhost:8080/api/v1/auctions/11111111-1111-1111-1111-111111111111/bid" `
+  -Headers @{ "X-Idempotency-Key" = [guid]::NewGuid().ToString() } `
   -ContentType "application/json" `
   -Body $body
 ```
 
-Wallet dùng khóa idempotency `deposit:{auctionId}:{userId}`, vì vậy cùng một user đặt nhiều bid trong một phiên chỉ bị freeze deposit một lần.
+Bid lưu chính `X-Idempotency-Key` vào unique index của bảng `bids`; wallet vẫn dùng khóa `deposit:{auctionId}:{userId}`, vì vậy cùng một user đặt nhiều bid trong một phiên chỉ bị freeze deposit một lần.
+
+Các API frontend bổ sung:
+
+```http
+GET  /api/v1/auctions/{auctionId}/bids
+GET  /api/v1/wallets/{userId}
+POST /api/v1/wallets/{userId}/top-up
+```
 
 ### Test PHASE 2 bằng Postman
 
-Nếu đang chạy các app container theo hướng dẫn của Codex, dùng `baseUrl = http://localhost:18080`. Nếu chạy `auction-service` trực tiếp bằng Maven, dùng port `8080`.
+Nếu đang chạy các app container theo hướng dẫn của Codex, dùng `baseUrl = http://localhost:28080`. Nếu chạy `auction-service` trực tiếp bằng Maven, dùng port `8080`.
 
 Tạo Postman environment:
 
 ```text
-baseUrl    = http://localhost:18080
+baseUrl    = http://localhost:28080
 auctionId  = 44444444-4444-4444-4444-444444444444
 loserId    = 33333333-3333-3333-3333-333333333333
 winnerId   = 22222222-2222-2222-2222-222222222222
@@ -305,7 +331,7 @@ Sau refund, `balance` tổng không đổi; `frozen_balance` của bidder thua g
 - Freeze wallet xảy ra trước khi auction transaction commit. Cần saga/compensating refund và reconciliation job để xử lý lỗi giữa hai service.
 - Distributed lock hỗ trợ giảm contention nhưng database constraints, optimistic version và idempotency vẫn là lớp bảo vệ tính đúng đắn.
 - Demo chưa có authentication/authorization, rate limiting, TLS/mTLS, secret manager, tracing, metrics dashboard hay double-entry ledger.
-- Frontend hiện dùng polling hai giây. SSE hoặc WebSocket kết hợp pub/sub sẽ phù hợp hơn khi cần fan-out real-time giữa nhiều instance.
+- Frontend hiện dùng polling 1.5 giây ở trang chi tiết. SSE hoặc WebSocket kết hợp pub/sub sẽ phù hợp hơn khi cần fan-out real-time giữa nhiều instance.
 
 ## Chuỗi lệnh tạo repository và push GitHub lần đầu
 

@@ -5,6 +5,7 @@ import com.omnibid.auction.dto.BidResponse;
 import com.omnibid.auction.dto.EndAuctionResponse;
 import com.omnibid.auction.dto.PlaceBidRequest;
 import com.omnibid.auction.repository.AuctionRepository;
+import com.omnibid.auction.repository.BidRepository;
 import com.omnibid.auction.service.AuctionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -27,6 +29,7 @@ import java.util.UUID;
 public class AuctionController {
 
     private final AuctionRepository auctionRepository;
+    private final BidRepository bidRepository;
     private final AuctionService auctionService;
 
     @GetMapping
@@ -43,16 +46,31 @@ public class AuctionController {
                 .orElseThrow(() -> new NoSuchElementException("Auction not found: " + auctionId));
     }
 
+    @GetMapping("/{auctionId}/bids")
+    public List<BidResponse> bidHistory(@PathVariable UUID auctionId) {
+        if (!auctionRepository.existsById(auctionId)) {
+            throw new NoSuchElementException("Auction not found: " + auctionId);
+        }
+        return bidRepository.findAllByAuctionIdOrderByPlacedAtDesc(auctionId).stream()
+                .map(BidResponse::from)
+                .toList();
+    }
+
     @PostMapping({"/{auctionId}/bid", "/{auctionId}/bids"})
     @ResponseStatus(HttpStatus.CREATED)
     public BidResponse placeBid(
             @PathVariable UUID auctionId,
+            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody PlaceBidRequest request
     ) {
+        String effectiveIdempotencyKey = idempotencyKey == null || idempotencyKey.isBlank()
+                ? UUID.randomUUID().toString()
+                : idempotencyKey.trim();
         return auctionService.placeBid(
                 auctionId,
                 request.userId(),
-                request.bidAmount()
+                request.bidAmount(),
+                effectiveIdempotencyKey
         );
     }
 

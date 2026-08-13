@@ -60,7 +60,8 @@ class AuctionServiceImplTest {
         assertThatThrownBy(() -> service.placeBid(
                 auctionId,
                 userId,
-                new BigDecimal("120.00")
+                new BigDecimal("120.00"),
+                UUID.randomUUID().toString()
         ))
                 .isInstanceOf(BidConcurrencyException.class)
                 .hasMessage("Hệ thống đang quá tải, vui lòng thử lại!");

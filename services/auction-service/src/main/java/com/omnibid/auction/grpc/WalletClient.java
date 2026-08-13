@@ -32,7 +32,10 @@ public class WalletClient {
 
         try {
             return walletStub
-                    .withDeadlineAfter(2, TimeUnit.SECONDS)
+                    // The first call after a container restart may need to establish
+                    // an HTTP/2 channel. Keep the deadline below the 5s lock lease.
+                    .withWaitForReady()
+                    .withDeadlineAfter(3, TimeUnit.SECONDS)
                     .freezeDeposit(request);
         } catch (StatusRuntimeException exception) {
             throw new IllegalStateException(

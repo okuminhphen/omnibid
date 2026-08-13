@@ -8,7 +8,12 @@ import java.util.UUID;
 
 public interface AuctionService {
 
-    BidResponse placeBid(UUID auctionId, UUID userId, BigDecimal bidAmount);
+    BidResponse placeBid(
+            UUID auctionId,
+            UUID userId,
+            BigDecimal bidAmount,
+            String idempotencyKey
+    );
 
     EndAuctionResponse endAuction(UUID auctionId);
 }

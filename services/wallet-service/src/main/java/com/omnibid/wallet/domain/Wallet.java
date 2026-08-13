@@ -71,4 +71,11 @@ public class Wallet {
         }
         frozenBalance = frozenBalance.subtract(amount);
     }
+
+    public void credit(BigDecimal amount) {
+        if (amount == null || amount.signum() <= 0) {
+            throw new IllegalArgumentException("Credit amount must be positive");
+        }
+        balance = balance.add(amount);
+    }
 }
