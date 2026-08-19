@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useAuth } from "@/components/AuthProvider";
 import { CountdownTimer } from "@/components/CountdownTimer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,16 +15,11 @@ import { anonymizeUserId, formatMoney } from "@/lib/utils";
 import { getAuctionDetail, getBidHistory, placeBid } from "@/services/auctionService";
 import type { Auction, BidHistory } from "@/types/auction";
 
-const DEMO_USERS = [
-  { id: "22222222-2222-2222-2222-222222222222", label: "Người dùng A" },
-  { id: "33333333-3333-3333-3333-333333333333", label: "Người dùng B" }
-];
-
 export default function AuctionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const { user, hydrated } = useAuth();
   const [auction, setAuction] = useState<Auction | null>(null);
   const [bids, setBids] = useState<BidHistory[]>([]);
-  const [userId, setUserId] = useState(DEMO_USERS[0].id);
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -79,6 +75,10 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
   async function submitBid(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!auction) return;
+    if (!user) {
+      setFeedback({ type: "error", text: "Bạn cần đăng nhập trước khi đặt giá." });
+      return;
+    }
 
     const numericAmount = Number(amount);
     if (!Number.isFinite(numericAmount) || numericAmount < suggestedBid) {
@@ -89,7 +89,7 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
     setSubmitting(true);
     setFeedback(null);
     try {
-      await placeBid(auction.id, userId, numericAmount);
+      await placeBid(auction.id, numericAmount);
       amountTouched.current = false;
       setFeedback({ type: "success", text: "Đặt giá thành công. Kafka audit event đã được phát." });
       await refresh();
@@ -205,17 +205,21 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
               </div>
 
               <form onSubmit={submitBid} className="space-y-4">
-                <div>
-                  <label htmlFor="bidder" className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-slate-400">Tài khoản demo</label>
-                  <select
-                    id="bidder"
-                    value={userId}
-                    onChange={(event) => setUserId(event.target.value)}
-                    className="h-12 w-full rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white outline-none focus:border-orange-400"
-                  >
-                    {DEMO_USERS.map((user) => <option key={user.id} value={user.id} className="bg-slate-900">{user.label} · {anonymizeUserId(user.id)}</option>)}
-                  </select>
-                </div>
+                {user ? (
+                  <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Đặt giá với</p>
+                      <p className="mt-1 text-sm font-bold text-white">{user.displayName}</p>
+                    </div>
+                    <span className="font-mono text-xs text-slate-500">{anonymizeUserId(user.id)}</span>
+                  </div>
+                ) : hydrated ? (
+                  <Link href="/login" className="block rounded-xl border border-orange-400/30 bg-orange-400/10 px-4 py-3 text-center text-sm font-bold text-orange-300 hover:bg-orange-400/20">
+                    Đăng nhập để đặt giá
+                  </Link>
+                ) : (
+                  <div className="h-12 animate-pulse rounded-xl bg-white/5" />
+                )}
                 <div>
                   <div className="mb-2 flex items-center justify-between">
                     <label htmlFor="amount" className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">Giá của bạn</label>
@@ -249,7 +253,7 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
                   <p className="mt-2 text-xs text-slate-500">Tối thiểu {formatMoney(suggestedBid)} · Header idempotency tự động</p>
                 </div>
 
-                <Button disabled={!isActive || submitting} className="h-14 w-full text-base">
+                <Button disabled={!isActive || submitting || !user} className="h-14 w-full text-base">
                   {submitting ? (
                     <><span className="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white" /> Đang lấy Redis Lock...</>
                   ) : (

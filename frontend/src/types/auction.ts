@@ -33,6 +33,17 @@ export interface WalletInfo {
   updatedAt: string | null;
 }
 
+export type WalletTransactionType = "TOP_UP" | "FREEZE" | "REFUND" | "DEDUCT" | "WITHDRAW";
+
+export interface WalletTransaction {
+  id: string;
+  auctionId: string | null;
+  amount: number;
+  type: WalletTransactionType;
+  status: "SUCCESS" | "FAILED";
+  createdAt: string;
+}
+
 export interface BidResponse {
   bidId: string;
   auctionId: string;

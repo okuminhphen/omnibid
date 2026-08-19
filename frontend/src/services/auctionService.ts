@@ -13,11 +13,9 @@ export async function getAuctionDetail(id: string): Promise<Auction> {
 
 export async function placeBid(
   auctionId: string,
-  userId: string,
   amount: number
 ): Promise<BidResponse> {
   const response = await api.post<BidResponse>(`/api/v1/auctions/${auctionId}/bid`, {
-    userId,
     bidAmount: amount
   });
   return response.data;

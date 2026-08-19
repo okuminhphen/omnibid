@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { AppProviders } from "@/components/AppProviders";
 import { SiteHeader } from "@/components/SiteHeader";
 import "./globals.css";
 
@@ -10,10 +11,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="vi">
+    <html lang="vi" data-scroll-behavior="smooth">
       <body>
-        <SiteHeader />
-        {children}
+        <AppProviders>
+          <SiteHeader />
+          {children}
+        </AppProviders>
       </body>
     </html>
   );
