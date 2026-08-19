@@ -22,6 +22,7 @@ Tài liệu chi tiết:
 
 - [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md): phân tích hệ thống, luồng dữ liệu và giới hạn hiện tại.
 - [PHASE_4_IDENTITY_AND_MARKETPLACE_DESIGN.md](docs/PHASE_4_IDENTITY_AND_MARKETPLACE_DESIGN.md): thiết kế schema user/session, RBAC, Google One Tap và roadmap marketplace.
+- [REPOSITORY_AUDIT.md](docs/REPOSITORY_AUDIT.md): kết quả build/test/security hygiene, các sạn đã sửa và giới hạn production còn lại.
 - [GITHUB_RELEASE_GUIDE.md](docs/GITHUB_RELEASE_GUIDE.md): quy trình push `develop`, mở PR, release `v1.0.0` và metadata GitHub.
 
 ## Kiến trúc
@@ -201,10 +202,10 @@ Nếu database đã tồn tại, PostgreSQL sẽ báo lỗi `already exists` và
 ```powershell
 $env:JAVA_HOME = "C:\Program Files\Java\jdk-21"
 $env:Path = "$env:JAVA_HOME\bin;$env:Path"
-mvn verify
+mvn --batch-mode --no-transfer-progress clean verify
 ```
 
-Trên thư mục đồng bộ OneDrive, `mvn clean` đôi khi bị file watcher giữ thư mục Protobuf tạm. `mvn verify` vẫn build/test đầy đủ mà không cần xóa target trước.
+Module `wallet-proto` dùng plugin Protobuf Maven đang được bảo trì và sinh cả Java message classes lẫn gRPC stubs trong cùng goal `generate`; lệnh `clean verify` đã được kiểm tra trên Windows/OneDrive và cũng là lệnh CI sử dụng trên Ubuntu.
 
 ### 4. Chạy backend
 
