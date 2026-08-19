@@ -78,4 +78,14 @@ public class Wallet {
         }
         balance = balance.add(amount);
     }
+
+    public void debitAvailable(BigDecimal amount) {
+        if (amount == null || amount.signum() <= 0) {
+            throw new IllegalArgumentException("Debit amount must be positive");
+        }
+        if (getAvailableBalance().compareTo(amount) < 0) {
+            throw new IllegalStateException("Available balance is too low");
+        }
+        balance = balance.subtract(amount);
+    }
 }

@@ -5,6 +5,7 @@ import com.omnibid.wallet.domain.WalletTransactionStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 public interface WalletTransactionRepository extends JpaRepository<WalletTransaction, UUID> {
@@ -15,4 +16,6 @@ public interface WalletTransactionRepository extends JpaRepository<WalletTransac
             UUID auctionId,
             WalletTransactionStatus status
     );
+
+    List<WalletTransaction> findTop100ByWalletIdOrderByCreatedAtDesc(UUID walletId);
 }

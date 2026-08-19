@@ -4,5 +4,6 @@ public enum WalletTransactionType {
     FREEZE,
     REFUND,
     DEDUCT,
-    TOP_UP
+    TOP_UP,
+    WITHDRAW
 }

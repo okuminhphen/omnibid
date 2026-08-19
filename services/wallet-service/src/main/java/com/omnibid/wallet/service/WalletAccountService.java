@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.NoSuchElementException;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -29,12 +30,7 @@ public class WalletAccountService {
 
     @Transactional
     public Wallet topUp(UUID userId, BigDecimal amount, String idempotencyKey) {
-        if (amount == null || amount.signum() <= 0) {
-            throw new IllegalArgumentException("Top-up amount must be positive");
-        }
-        if (idempotencyKey == null || idempotencyKey.isBlank() || idempotencyKey.length() > 120) {
-            throw new IllegalArgumentException("X-Idempotency-Key must contain 1 to 120 characters");
-        }
+        validateMoneyCommand(amount, idempotencyKey, "Top-up");
 
         Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
                 .orElseThrow(() -> new NoSuchElementException("Wallet not found for user: " + userId));
@@ -66,6 +62,60 @@ public class WalletAccountService {
         transaction.setIdempotencyKey(idempotencyKey);
         transactionRepository.save(transaction);
         return wallet;
+    }
+
+    @Transactional
+    public Wallet withdraw(UUID userId, BigDecimal amount, String idempotencyKey) {
+        validateMoneyCommand(amount, idempotencyKey, "Withdraw");
+        Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
+                .orElseThrow(() -> new NoSuchElementException("Wallet not found for user: " + userId));
+
+        WalletTransaction duplicate = transactionRepository.findByIdempotencyKey(idempotencyKey)
+                .orElse(null);
+        if (duplicate != null) {
+            boolean sameRequest = duplicate.getType() == WalletTransactionType.WITHDRAW
+                    && duplicate.getStatus() == WalletTransactionStatus.SUCCESS
+                    && duplicate.getWalletId().equals(wallet.getId())
+                    && duplicate.getAmount().compareTo(amount) == 0;
+            if (!sameRequest) {
+                throw new IllegalArgumentException(
+                        "X-Idempotency-Key was already used for a different wallet operation"
+                );
+            }
+            return wallet;
+        }
+
+        wallet.debitAvailable(amount);
+        WalletTransaction transaction = new WalletTransaction();
+        transaction.setId(UUID.randomUUID());
+        transaction.setWalletId(wallet.getId());
+        transaction.setAmount(amount);
+        transaction.setType(WalletTransactionType.WITHDRAW);
+        transaction.setStatus(WalletTransactionStatus.SUCCESS);
+        transaction.setIdempotencyKey(idempotencyKey);
+        transactionRepository.save(transaction);
+        return wallet;
+    }
+
+    @Transactional(readOnly = true)
+    public List<WalletTransaction> transactionHistory(UUID userId) {
+        Wallet wallet = walletRepository.findByUserId(userId)
+                .orElseThrow(() -> new NoSuchElementException("Wallet not found for user: " + userId));
+        return transactionRepository.findTop100ByWalletIdOrderByCreatedAtDesc(wallet.getId());
+    }
+
+    @Transactional
+    public Wallet provisionWallet(UUID userId) {
+        Wallet existing = walletRepository.findByUserId(userId).orElse(null);
+        if (existing != null) {
+            return existing;
+        }
+        Wallet wallet = new Wallet();
+        wallet.setId(userId);
+        wallet.setUserId(userId);
+        wallet.setBalance(BigDecimal.ZERO.setScale(2));
+        wallet.setFrozenBalance(BigDecimal.ZERO.setScale(2));
+        return walletRepository.save(wallet);
     }
 
     @Transactional
@@ -140,6 +190,18 @@ public class WalletAccountService {
                 && transaction.getAmount().compareTo(amount) == 0;
         if (!samePayload) {
             throw new IllegalArgumentException("Idempotency key was already used with a different payload");
+        }
+    }
+
+    private void validateMoneyCommand(BigDecimal amount, String idempotencyKey, String operation) {
+        if (amount == null || amount.signum() <= 0) {
+            throw new IllegalArgumentException(operation + " amount must be positive");
+        }
+        if (amount.compareTo(new BigDecimal("10000000.00")) > 0) {
+            throw new IllegalArgumentException(operation + " amount exceeds the demo limit");
+        }
+        if (idempotencyKey == null || idempotencyKey.isBlank() || idempotencyKey.length() > 120) {
+            throw new IllegalArgumentException("X-Idempotency-Key must contain 1 to 120 characters");
         }
     }
 }
