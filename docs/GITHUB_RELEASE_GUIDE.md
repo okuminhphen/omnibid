@@ -8,15 +8,14 @@ Tài liệu này là checklist phát hành cho repository `okuminhphen/omnibid`.
 git status
 git log --oneline main..develop
 git push -u origin develop
-gh pr create \
+gh pr create --web \
   --repo okuminhphen/omnibid \
   --base main \
   --head develop \
-  --title "feat: deliver OmniBid identity, secure wallet, CI, and repository standards" \
-  --body-file .github/PULL_REQUEST_TEMPLATE.md
+  --title "feat: deliver OmniBid identity, secure wallet, CI, and repository standards"
 ```
 
-Nếu chưa cài GitHub CLI, push bằng lệnh trên rồi mở:
+GitHub sẽ nạp pull request template để điền evidence và checklist trước khi submit. Nếu chưa cài GitHub CLI, push bằng lệnh trên rồi mở:
 
 `https://github.com/okuminhphen/omnibid/compare/main...develop?expand=1`
 
