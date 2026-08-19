@@ -1,5 +1,19 @@
 # OmniBid
 
+[![CI](https://github.com/okuminhphen/omnibid/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/okuminhphen/omnibid/actions/workflows/ci.yml)
+[![Java 21](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
+[![Spring Boot 3.3.5](https://img.shields.io/badge/Spring%20Boot-3.3.5-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![Next.js 16](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![TypeScript 5.6](https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
+[![Kafka Redpanda](https://img.shields.io/badge/Kafka-Redpanda-E43F5A?logo=apachekafka&logoColor=white)](https://redpanda.com/)
+[![RabbitMQ 3.13](https://img.shields.io/badge/RabbitMQ-3.13-FF6600?logo=rabbitmq&logoColor=white)](https://www.rabbitmq.com/)
+[![Redis 7.4](https://img.shields.io/badge/Redis-7.4-DC382D?logo=redis&logoColor=white)](https://redis.io/)
+[![PostgreSQL 16](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![MongoDB 7](https://img.shields.io/badge/MongoDB-7-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
+[![Architecture](https://img.shields.io/badge/Architecture-Event--Driven%20Monorepo-6F42C1)](PROJECT_OVERVIEW.md)
+[![License MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 OmniBid là monorepo sàn đấu giá gần real-time phục vụ học tập và portfolio Backend/Middle Developer. Project tập trung vào tính đúng đắn khi nhiều người cùng đặt giá, giao tiếp đồng bộ/bất đồng bộ giữa microservice, idempotency tài chính và authentication theo chuẩn OIDC.
 
 > Đây là portfolio/learning project. Ví chỉ mô phỏng tiền nội bộ; chưa kết nối ngân hàng hay xử lý tiền thật.
@@ -8,6 +22,7 @@ Tài liệu chi tiết:
 
 - [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md): phân tích hệ thống, luồng dữ liệu và giới hạn hiện tại.
 - [PHASE_4_IDENTITY_AND_MARKETPLACE_DESIGN.md](docs/PHASE_4_IDENTITY_AND_MARKETPLACE_DESIGN.md): thiết kế schema user/session, RBAC, Google One Tap và roadmap marketplace.
+- [GITHUB_RELEASE_GUIDE.md](docs/GITHUB_RELEASE_GUIDE.md): quy trình push `develop`, mở PR, release `v1.0.0` và metadata GitHub.
 
 ## Kiến trúc
 
