@@ -1,6 +1,6 @@
 # OmniBid repository audit
 
-Ngày kiểm tra: **2026-08-19**
+Ngày hoàn tất kiểm tra: **2026-08-20**
 
 Nhánh kiểm tra: **`develop`**
 
@@ -19,6 +19,7 @@ Badge CI trên README chỉ chuyển sang trạng thái thực sau khi nhánh `d
 | Backend toolchain | JDK 21.0.1, Maven 3.9.12 | Pass |
 | Backend reactor | `mvn --batch-mode --no-transfer-progress clean verify` | Pass, 6/6 reactor projects |
 | Backend tests | Identity 6, Auction 3, Wallet 6, Audit 1 | Pass, **16/16**, 0 failure/error/skipped |
+| Frontend toolchain | Node.js 20.20.2 | Pass |
 | Dependency install | `npm ci` | Pass, 132 packages audited, **0 vulnerability** |
 | TypeScript | `npm run typecheck` | Pass |
 | Next.js production | `npm run build` | Pass, 6 routes generated |
@@ -40,6 +41,10 @@ Plugin `org.xolstice:protobuf-maven-plugin:0.6.1` đã ngừng bảo trì và th
 - Pull request template buộc ghi rõ distributed lock, idempotency, gRPC, delivery semantics, rollback và verification.
 - Feature/bug templates có architecture trade-offs, service impact, logs và điều kiện phân tán.
 - MIT license, release notes `v1.0.0`, About text và GitHub topics đã được chuẩn hóa.
+
+### Next.js generated type hygiene
+
+Next.js 16 tự tái tạo `next-env.d.ts` với đường dẫn khác nhau giữa `dev` và production build. File này đã được bỏ khỏi Git và thêm vào `.gitignore`; script `typecheck` chạy `next typegen` trước `tsc --noEmit`. Quy trình đã được kiểm tra lại sau khi xóa hoàn toàn `frontend/.next`, nên CI không phụ thuộc artifact sinh từ máy developer.
 
 ### Docker ChatbotX cleanup
 
