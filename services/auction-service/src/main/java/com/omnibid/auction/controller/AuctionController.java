@@ -10,6 +10,8 @@ import com.omnibid.auction.service.AuctionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -61,6 +63,7 @@ public class AuctionController {
     public BidResponse placeBid(
             @PathVariable UUID auctionId,
             @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
+            @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody PlaceBidRequest request
     ) {
         String effectiveIdempotencyKey = idempotencyKey == null || idempotencyKey.isBlank()
@@ -68,7 +71,7 @@ public class AuctionController {
                 : idempotencyKey.trim();
         return auctionService.placeBid(
                 auctionId,
-                request.userId(),
+                UUID.fromString(jwt.getSubject()),
                 request.bidAmount(),
                 effectiveIdempotencyKey
         );

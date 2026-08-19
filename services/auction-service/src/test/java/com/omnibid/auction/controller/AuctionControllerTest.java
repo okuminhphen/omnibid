@@ -9,6 +9,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.oauth2.jwt.Jwt;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -33,11 +34,16 @@ class AuctionControllerTest {
         UUID auctionId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("120.00");
+        Jwt jwt = Jwt.withTokenValue("test-token")
+                .header("alg", "none")
+                .subject(userId.toString())
+                .build();
 
         controller.placeBid(
                 auctionId,
                 "frontend-request-key",
-                new PlaceBidRequest(userId, amount)
+                jwt,
+                new PlaceBidRequest(amount)
         );
 
         verify(auctionService).placeBid(

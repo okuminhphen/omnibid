@@ -49,6 +49,12 @@ management:
       exposure:
         include: health,info
 
+security:
+  jwt:
+    jwk-set-uri: ${IDENTITY_JWK_SET_URI:http://localhost:8083/.well-known/jwks.json}
+    issuer: ${OMNIBID_TOKEN_ISSUER:http://localhost:8083}
+    audience: ${OMNIBID_TOKEN_AUDIENCE:omnibid-api}
+
 omnibid:
   kafka:
     bid-topic: ${BID_TOPIC:bid-events}

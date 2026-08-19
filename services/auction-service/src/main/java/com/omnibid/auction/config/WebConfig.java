@@ -12,6 +12,6 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addMapping("/api/**")
                 .allowedOrigins("http://localhost:3000")
                 .allowedMethods("GET", "POST")
-                .allowedHeaders("Content-Type", "X-Idempotency-Key");
+                .allowedHeaders("Authorization", "Content-Type", "X-Idempotency-Key");
     }
 }
