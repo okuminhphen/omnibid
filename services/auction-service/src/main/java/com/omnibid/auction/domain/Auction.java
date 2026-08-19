@@ -28,19 +28,51 @@ public class Auction {
     @Column(nullable = false, length = 200)
     private String title;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private AuctionStatus status;
+    @Column(name = "starting_price", nullable = false, precision = 19, scale = 2)
+    private BigDecimal startingPrice;
 
     @Column(name = "current_price", nullable = false, precision = 19, scale = 2)
     private BigDecimal currentPrice;
 
-    @Column(name = "highest_bidder_id")
-    private UUID highestBidderId;
+    @Column(name = "step_price", nullable = false, precision = 19, scale = 2)
+    private BigDecimal stepPrice;
 
-    @Column(name = "ends_at", nullable = false)
-    private Instant endsAt;
+    @Column(name = "deposit_amount", nullable = false, precision = 19, scale = 2)
+    private BigDecimal depositAmount;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private AuctionStatus status;
+
+    @Column(name = "start_time", nullable = false)
+    private Instant startTime;
+
+    @Column(name = "end_time", nullable = false)
+    private Instant endTime;
+
+    @Column(name = "winning_user_id")
+    private UUID winningUserId;
 
     @Version
     private long version;
+
+    public boolean isActiveAt(Instant time) {
+        return status == AuctionStatus.ACTIVE
+                && !time.isBefore(startTime)
+                && time.isBefore(endTime);
+    }
+
+    public BigDecimal minimumNextBid() {
+        return currentPrice.add(stepPrice);
+    }
+
+    public void acceptBid(UUID userId, BigDecimal bidAmount) {
+        currentPrice = bidAmount;
+        winningUserId = userId;
+    }
+
+    public void end(Instant endedAt) {
+        status = AuctionStatus.ENDED;
+        endTime = endedAt;
+    }
 }

@@ -1,0 +1,53 @@
+server:
+  port: ${SERVER_PORT:8083}
+
+spring:
+  application:
+    name: identity-service
+  profiles:
+    default: local
+  datasource:
+    url: ${IDENTITY_DB_URL:jdbc:postgresql://localhost:5432/identity_db}
+    username: ${POSTGRES_USER:omnibid}
+    password: ${POSTGRES_PASSWORD:omnibid}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+omnibid:
+  identity:
+    issuer: ${OMNIBID_TOKEN_ISSUER:http://localhost:8083}
+    audience: ${OMNIBID_TOKEN_AUDIENCE:omnibid-api}
+    access-token-ttl: PT10M
+    refresh-token-ttl: P30D
+    refresh-cookie-name: omnibid_refresh
+    refresh-cookie-secure: ${AUTH_COOKIE_SECURE:false}
+    allowed-origins:
+      - ${FRONTEND_ORIGIN:http://localhost:3000}
+    google:
+      enabled: ${GOOGLE_AUTH_ENABLED:false}
+      client-id: ${GOOGLE_CLIENT_ID:}
+      jwk-set-uri: https://www.googleapis.com/oauth2/v3/certs
+    kafka:
+      identity-topic: ${IDENTITY_TOPIC:identity-events}

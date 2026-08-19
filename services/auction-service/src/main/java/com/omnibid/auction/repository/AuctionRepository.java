@@ -7,5 +7,5 @@ import java.util.List;
 import java.util.UUID;
 
 public interface AuctionRepository extends JpaRepository<Auction, UUID> {
-    List<Auction> findAllByOrderByEndsAtAsc();
+    List<Auction> findAllByOrderByEndTimeAsc();
 }

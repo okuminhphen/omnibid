@@ -16,20 +16,31 @@ import java.util.UUID;
 public class DemoDataConfig {
 
     public static final UUID DEMO_AUCTION_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    public static final UUID PHASE_2_AUCTION_ID = UUID.fromString("44444444-4444-4444-4444-444444444444");
 
     @Bean
     CommandLineRunner seedAuction(AuctionRepository repository) {
         return args -> {
-            if (repository.existsById(DEMO_AUCTION_ID)) {
-                return;
-            }
-            Auction auction = new Auction();
-            auction.setId(DEMO_AUCTION_ID);
-            auction.setTitle("Mechanical Keyboard - Founder's Edition");
-            auction.setStatus(AuctionStatus.ACTIVE);
-            auction.setCurrentPrice(new BigDecimal("100.00"));
-            auction.setEndsAt(Instant.now().plus(30, ChronoUnit.DAYS));
-            repository.save(auction);
+            seedAuction(repository, DEMO_AUCTION_ID, "Mechanical Keyboard - Founder's Edition");
+            seedAuction(repository, PHASE_2_AUCTION_ID, "Phase 2 Event-Driven Auction");
         };
+    }
+
+    private void seedAuction(AuctionRepository repository, UUID auctionId, String title) {
+        if (repository.existsById(auctionId)) {
+            return;
+        }
+
+        Auction auction = new Auction();
+        auction.setId(auctionId);
+        auction.setTitle(title);
+        auction.setStatus(AuctionStatus.ACTIVE);
+        auction.setStartingPrice(new BigDecimal("100.00"));
+        auction.setCurrentPrice(new BigDecimal("100.00"));
+        auction.setStepPrice(new BigDecimal("10.00"));
+        auction.setDepositAmount(new BigDecimal("100.00"));
+        auction.setStartTime(Instant.now().minus(1, ChronoUnit.DAYS));
+        auction.setEndTime(Instant.now().plus(30, ChronoUnit.DAYS));
+        repository.save(auction);
     }
 }

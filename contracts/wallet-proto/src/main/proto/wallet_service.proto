@@ -7,20 +7,21 @@ option java_package = "com.omnibid.contract.wallet.v1";
 option java_outer_classname = "WalletServiceProto";
 
 service WalletService {
-  rpc FreezeDeposit(FreezeRequest) returns (FreezeResponse);
+  rpc FreezeDeposit(FreezeDepositRequest) returns (FreezeDepositResponse);
 }
 
-message FreezeRequest {
-  string request_id = 1;
-  string auction_id = 2;
-  string bidder_id = 3;
-  string bid_id = 4;
-  string amount = 5;
+message FreezeDepositRequest {
+  // Stable key supplied by the caller. Retrying the same logical operation
+  // must not freeze money twice.
+  string idempotency_key = 1;
+  string user_id = 2;
+  string amount = 3;
+  string auction_id = 4;
 }
 
-message FreezeResponse {
+message FreezeDepositResponse {
   bool success = 1;
-  string transaction_id = 2;
-  string error_code = 3;
-  string message = 4;
+  string message = 2;
+  string transaction_id = 3;
+  string error_code = 4;
 }

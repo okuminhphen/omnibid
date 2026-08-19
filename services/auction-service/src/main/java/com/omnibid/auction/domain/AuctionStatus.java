@@ -1,8 +1,7 @@
 package com.omnibid.auction.domain;
 
 public enum AuctionStatus {
-    DRAFT,
+    PENDING,
     ACTIVE,
-    ENDED,
-    CANCELLED
+    ENDED
 }

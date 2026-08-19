@@ -7,55 +7,51 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
-import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class RefundConsumer {
 
-    private static final Duration PROCESSING_TTL = Duration.ofMinutes(5);
-    private static final Duration COMPLETED_TTL = Duration.ofDays(30);
-
     private final StringRedisTemplate redisTemplate;
     private final RefundService refundService;
 
     @RabbitListener(queues = "${omnibid.rabbitmq.refund-queue}")
-    public void consume(RefundMessage message) {
-        validate(message);
-        String key = "idempotent:refund:" + message.messageId();
+    public void consume(RefundCommand command) {
+        validate(command);
+        String key = "idempotent:refund:" + command.transactionId();
 
-        String currentState = redisTemplate.opsForValue().get(key);
-        if ("COMPLETED".equals(currentState)) {
-            log.info("Skipping completed refund message {}", message.messageId());
+        Boolean reserved = redisTemplate.opsForValue().setIfAbsent(
+                key,
+                "PROCESSING",
+                10,
+                TimeUnit.MINUTES
+        );
+        if (!Boolean.TRUE.equals(reserved)) {
+            log.info("Skipping duplicate refund transaction {}", command.transactionId());
             return;
         }
 
-        Boolean reserved = redisTemplate.opsForValue()
-                .setIfAbsent(key, "PROCESSING", PROCESSING_TTL);
-        if (!Boolean.TRUE.equals(reserved)) {
-            // A prior process may have died after SETNX but before DB commit. Continue
-            // through the durable DB idempotency check instead of ACKing and losing it.
-            log.warn("Refund {} already has PROCESSING marker; verifying durable state", message.messageId());
-        }
-
         try {
-            // The DB transaction also has a unique request_id as a second safety net
-            // if Redis loses data or the marker expires after a process crash.
-            refundService.refund(message);
-            redisTemplate.opsForValue().set(key, "COMPLETED", COMPLETED_TTL);
+            // PostgreSQL also stores a unique refund:{transactionId} key. Redis is the
+            // fast dedupe layer; the database remains the durable safety net.
+            refundService.refund(command);
+            redisTemplate.opsForValue().set(key, "SUCCESS", 30, TimeUnit.DAYS);
         } catch (RuntimeException exception) {
-            if (Boolean.TRUE.equals(reserved)) {
-                redisTemplate.delete(key);
-            }
+            redisTemplate.delete(key);
             throw exception;
         }
     }
 
-    private void validate(RefundMessage message) {
-        if (message == null || message.messageId() == null || message.messageId().isBlank()
-                || message.messageId().length() > 100 || message.walletId() == null) {
-            throw new IllegalArgumentException("Invalid refund message");
+    private void validate(RefundCommand command) {
+        if (command == null
+                || command.transactionId() == null
+                || command.userId() == null
+                || command.auctionId() == null
+                || command.amount() == null
+                || command.amount().signum() <= 0) {
+            throw new IllegalArgumentException("Invalid refund command");
         }
     }
 }

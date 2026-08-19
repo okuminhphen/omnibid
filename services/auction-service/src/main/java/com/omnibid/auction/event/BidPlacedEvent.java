@@ -1,18 +1,19 @@
 package com.omnibid.auction.event;
 
+import java.io.Serial;
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
 public record BidPlacedEvent(
-        UUID eventId,
-        int schemaVersion,
         UUID bidId,
         UUID auctionId,
-        UUID bidderId,
-        BigDecimal amount,
-        UUID walletTransactionId,
-        String correlationId,
-        Instant occurredAt
-) {
+        UUID userId,
+        BigDecimal bidAmount,
+        Instant timestamp
+) implements Serializable {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
 }
