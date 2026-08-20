@@ -1,6 +1,6 @@
 # OmniBid — Architectural Review
 
-> Cập nhật ngày 19/08/2026 sau khi triển khai Identity/RBAC và personal wallet API. Lệnh chạy chi tiết nằm trong [README.md](README.md); schema/roadmap mở rộng nằm trong [Phase 4 Design](docs/PHASE_4_IDENTITY_AND_MARKETPLACE_DESIGN.md).
+> Cập nhật ngày 20/08/2026 sau đợt hardening Flyway, transactional outbox, automatic auction ending và Testcontainers. Lệnh chạy chi tiết nằm trong [README.md](README.md); schema/roadmap mở rộng nằm trong [Phase 4 Design](docs/PHASE_4_IDENTITY_AND_MARKETPLACE_DESIGN.md).
 
 ## 1. Project giải quyết bài toán gì?
 
@@ -14,6 +14,8 @@ Các chủ đề nổi bật để trình bày trong CV:
 - gRPC cho quyết định đồng bộ cần phản hồi tức thời.
 - Kafka cho event stream/audit và RabbitMQ cho work queue/retry/DLQ.
 - Idempotency nhiều lớp: HTTP, gRPC, Kafka consumer, RabbitMQ consumer và unique constraint.
+- Transactional outbox để đóng failure window giữa auction database và Kafka/RabbitMQ.
+- Testcontainers kiểm chứng migration/constraint trên PostgreSQL và mutual exclusion trên Redis thật.
 - Authentication bằng Google OIDC, JWT RS256, rotating refresh session và RBAC.
 - Polyglot persistence với PostgreSQL, MongoDB và Redis.
 
@@ -96,15 +98,16 @@ Thứ tự xử lý:
 1. Spring Security verify JWT và role.
 2. Controller lấy `userId = UUID.fromString(jwt.subject)`.
 3. Kiểm tra idempotency key bền vững ở bảng bid.
-4. `tryLock(lock:auction:{id}, wait=3s, lease=5s)`.
+4. `tryLock(lock:auction:{id}, wait=3s)`; Redisson watchdog gia hạn lease trong lúc current thread giữ lock.
 5. Sau khi giữ lock, đọc lại auction và validate `ACTIVE`, thời gian, `currentPrice + stepPrice`.
 6. Gọi gRPC `FreezeDeposit` với deadline và operation key ổn định.
 7. Wallet lock row, kiểm tra available balance, tăng frozen balance và ghi unique transaction.
-8. Auction cập nhật current price/winner, insert bid và cache giá.
-9. Publish `BidPlacedEvent`; Audit consumer dùng `bidId` làm Mongo `_id`.
-10. `finally` chỉ unlock khi current thread còn sở hữu lock.
+8. Auction cập nhật current price/winner, insert bid và outbox row trong cùng PostgreSQL transaction.
+9. Sau commit, cập nhật Redis price cache theo best-effort; cache lỗi không đảo ngược bid đã commit.
+10. Scheduled outbox publisher chờ Kafka acknowledgement rồi mới đánh dấu event published; Audit consumer dùng `bidId` làm Mongo `_id`.
+11. `finally` chỉ unlock khi current thread còn sở hữu lock.
 
-Redis lock giảm contention và serialize toàn cluster; optimistic version, unique idempotency key và database transaction mới là các correctness guard bổ sung nếu lock hết lease hoặc request retry.
+Redis lock giảm contention và serialize toàn cluster; watchdog tránh lock hết lease giữa critical section. Optimistic version, unique idempotency key và database transaction vẫn là correctness guard nếu một writer bỏ qua Redis hoặc request được retry.
 
 ## 5. Messaging semantics
 
@@ -114,7 +117,7 @@ Redis lock giảm contention và serialize toàn cluster; optimistic version, un
 - `bid-events`: Auction phát `BidPlacedEvent`; Audit consumer ghi MongoDB.
 - Producer bật idempotence/`acks=all`; consumer vẫn phải chịu được at-least-once delivery.
 
-Identity đã có outbox table/publisher. Auction bid event vẫn là DB/broker dual-write, vì vậy Transactional Outbox + CDC cho Auction là bước production tiếp theo.
+Identity và Auction đều có outbox table/publisher. Auction dùng `FOR UPDATE SKIP LOCKED`, broker acknowledgement và trạng thái pending/published để hỗ trợ nhiều instance cùng poll với delivery at-least-once. Audit vẫn idempotent theo `bidId`, còn wallet refund idempotent theo `transactionId`.
 
 ### RabbitMQ refund
 
@@ -122,6 +125,9 @@ Identity đã có outbox table/publisher. Auction bid event vẫn là DB/broker 
 - Queue `wallet.refund.queue` có retry; lỗi cuối cùng đi vào `wallet.refund.dlq`.
 - Redis `SET NX idempotent:refund:{transactionId}` là fast dedupe.
 - Unique wallet transaction ở PostgreSQL là durable safety net khi Redis mất dữ liệu.
+- Refund command được ghi vào auction outbox trong cùng transaction kết thúc phiên; Rabbit publisher confirm quyết định khi nào outbox row được đánh dấu published.
+
+Auction scheduler quét tối đa 100 phiên `ACTIVE` đã qua `endTime` mỗi lượt. Nó gọi lại cùng `endAuction()` có Redisson lock và deterministic refund transaction ID, nên API thủ công và scheduler không tạo hai khoản hoàn tiền.
 
 ## 6. Wallet semantics
 
@@ -171,6 +177,7 @@ Auction domain:
 ```text
 auctions
 bids
+auction_outbox_events
 ```
 
 Wallet domain:
@@ -193,13 +200,14 @@ bid_logs (compound index auctionId ASC, timestamp DESC)
 | Kiểm tra | Kết quả |
 |---|---|
 | Maven reactor | 6/6 module `verify` thành công bằng JDK 21 |
-| Backend unit tests | 16 pass: identity 6, auction 3, wallet 6, audit 1 |
+| Backend tests | 24 pass: identity 6, auction 10, wallet 7, audit 1 |
+| Testcontainers | PostgreSQL 16 auction/wallet migrations + Redis 7.4 contention 20 luồng |
 | Identity security tests | hash-only refresh, rotation, reuse revokes family |
 | Frontend typecheck | Pass |
 | Next production build | Pass với 6 route |
 | Docker infrastructure | PostgreSQL/Mongo/Redis/Rabbit/Redpanda/LocalStack healthy |
 
-`mvn clean verify` có thể vấp file lock ở thư mục Protobuf tạm khi project nằm trong OneDrive; chạy `mvn verify` đã build và test đầy đủ.
+`mvn clean verify` đã chạy thành công trên Windows/OneDrive bằng JDK 21. Docker Desktop phải hoạt động vì integration tests tạo PostgreSQL/Redis container tạm.
 
 ## 10. Đánh giá Senior Engineer
 
@@ -215,15 +223,14 @@ bid_logs (compound index auctionId ASC, timestamp DESC)
 ### Khoảng trống trước production
 
 1. Freeze thành công nhưng auction commit lỗi cần saga/compensating action và reconciliation.
-2. Auction cần Transactional Outbox/CDC cho Kafka và RabbitMQ.
-3. Wallet cần double-entry ledger, settlement, reconciliation và audit tài chính.
-4. Signing key local sinh lại khi restart; production cần KMS/Vault, persistent keys và rotation.
-5. Cần CSRF/origin hardening đầy đủ, rate limiting, account-link flow, MFA cho admin và secret manager.
-6. Cần Testcontainers, load test concurrent bid, broker redelivery và failure injection.
-7. Cần OpenTelemetry, correlation ID, metrics, dashboards, alerts và centralized logging.
-8. Auction schema cần Flyway thay cho `ddl-auto=update`.
-9. Cần API Gateway, TLS/mTLS và deployment manifests.
-10. Product/catalog/S3 media/admin lifecycle/history đầy đủ mới ở design, chưa hoàn tất implementation.
+2. Wallet cần double-entry ledger, winner settlement, reconciliation và audit tài chính.
+3. Signing key local sinh lại khi restart; production cần KMS/Vault, persistent keys và rotation.
+4. Cần CSRF/origin hardening đầy đủ, rate limiting, account-link flow, MFA cho admin và secret manager.
+5. Cần load test concurrent bid, broker redelivery test và failure injection cho Redis/broker/network partition.
+6. Cần OpenTelemetry, correlation ID, outbox backlog metrics, dashboards, alerts và centralized logging.
+7. Scheduled outbox polling phù hợp portfolio; production scale lớn nên dùng backoff/poison quarantine và cân nhắc CDC.
+8. Cần API Gateway, TLS/mTLS và deployment manifests.
+9. Product/catalog/S3 media/admin lifecycle/history đầy đủ mới ở design, chưa hoàn tất implementation.
 
 ## 11. Roadmap phù hợp cho CV
 
@@ -231,12 +238,12 @@ Thứ tự nên làm tiếp:
 
 1. Product/catalog + admin auction lifecycle + S3 presigned upload.
 2. User bid/win/purchase history và settlement người thắng.
-3. Transactional Outbox + Debezium.
-4. Testcontainers và k6/Gatling test 100–1.000 concurrent bid.
-5. SSE/WebSocket fan-out qua Redis/Kafka.
-6. OpenTelemetry + Prometheus/Grafana.
-7. Double-entry ledger + reconciliation.
-8. API Gateway, rate limit, mTLS và CI/CD.
+3. k6/Gatling test 100–1.000 concurrent bid và broker failure injection.
+4. SSE/WebSocket fan-out qua Redis/Kafka.
+5. OpenTelemetry + Prometheus/Grafana, gồm outbox backlog/oldest-event alert.
+6. Double-entry ledger + reconciliation và winner settlement saga.
+7. Debezium CDC nếu polling outbox trở thành bottleneck.
+8. API Gateway, rate limit, mTLS và deployment pipeline.
 
 ## 12. Mô tả dùng cho CV
 

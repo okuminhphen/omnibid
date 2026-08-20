@@ -23,6 +23,7 @@ Tài liệu chi tiết:
 - [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md): phân tích hệ thống, luồng dữ liệu và giới hạn hiện tại.
 - [PHASE_4_IDENTITY_AND_MARKETPLACE_DESIGN.md](docs/PHASE_4_IDENTITY_AND_MARKETPLACE_DESIGN.md): thiết kế schema user/session, RBAC, Google One Tap và roadmap marketplace.
 - [REPOSITORY_AUDIT.md](docs/REPOSITORY_AUDIT.md): kết quả build/test/security hygiene, các sạn đã sửa và giới hạn production còn lại.
+- [FRESHER_HARDENING.md](docs/FRESHER_HARDENING.md): Flyway, outbox, lock watchdog, Testcontainers và kịch bản trình bày khi phỏng vấn.
 - [GITHUB_RELEASE_GUIDE.md](docs/GITHUB_RELEASE_GUIDE.md): quy trình push `develop`, mở PR, release `v1.0.0` và metadata GitHub.
 
 ## Kiến trúc
@@ -36,6 +37,7 @@ flowchart LR
     Audit["Audit Service :8082"]
     IDDB[(identity_db)]
     ADB[(auction_db)]
+    Outbox[(auction_outbox_events)]
     WDB[(wallet_db)]
     Redis[(Redis)]
     Kafka[(Redpanda / Kafka)]
@@ -50,13 +52,14 @@ flowchart LR
     Browser -->|"Bearer JWT + wallet command"| Wallet
     Auction -->|"RLock lock:auction:{id}"| Redis
     Auction --> ADB
+    ADB --> Outbox
     Auction -->|"FreezeDeposit gRPC"| Wallet
     Wallet --> WDB
     Kafka -->|"provision wallet"| Wallet
-    Auction -->|"BidPlacedEvent"| Kafka
+    Outbox -->|"BidPlacedEvent"| Kafka
     Kafka --> Audit
     Audit --> Mongo
-    Auction -->|"RefundCommand"| Rabbit
+    Outbox -->|"RefundCommand"| Rabbit
     Rabbit --> Wallet
 ```
 
@@ -91,18 +94,21 @@ sequenceDiagram
     participant R as Redis
     participant W as Wallet gRPC
     participant DB as PostgreSQL
+    participant O as Auction Outbox
     participant K as Kafka
 
     UI->>A: POST /bid (Bearer JWT, bidAmount)
     A->>A: derive userId from signed JWT sub
-    A->>R: tryLock(lock:auction:{id}, 3s, 5s)
+    A->>R: tryLock(lock:auction:{id}, wait 3s, watchdog lease)
     A->>DB: reload + validate ACTIVE/current price/step
     A->>W: FreezeDeposit(userId, auctionId, idempotencyKey)
     W->>DB: SELECT wallet FOR UPDATE + unique transaction
     A->>DB: update auction + insert bid
-    A->>K: BidPlacedEvent
+    A->>O: insert BidPlacedEvent (same DB transaction)
     A->>R: unlock only when owned by current thread
     A-->>UI: BidResponse
+    O->>K: publish and wait for broker ack
+    O->>O: mark published or retain for retry
 ```
 
 ## Chức năng hiện có
@@ -114,7 +120,11 @@ sequenceDiagram
 - Quản lý hồ sơ và thu hồi từng/all login session.
 - Ví cá nhân: nạp/rút tiền demo, available/frozen balance và lịch sử giao dịch idempotent.
 - Đặt giá qua Redis distributed lock, freeze deposit qua gRPC và optimistic lock dự phòng.
+- Redisson watchdog tự gia hạn lock để critical section không mất lock khi gRPC/DB chậm hơn lease cố định.
+- Auction transactional outbox gắn bid/refund với DB transaction; publisher chỉ đánh dấu hoàn tất sau broker acknowledgement.
+- Scheduler tự tìm tối đa 100 phiên `ACTIVE` hết hạn mỗi lượt và chốt qua cùng distributed lock với API thủ công.
 - Kafka audit log vào MongoDB; RabbitMQ refund có retry, DLQ, Redis fast dedupe và PostgreSQL durable dedupe.
+- Flyway sở hữu schema auction/wallet; Hibernate chạy `validate` thay vì tự sửa database bằng `ddl-auto=update`.
 - UI polling gần real-time; có thể mở cửa sổ thường + ẩn danh để đấu giá bằng hai user khác nhau.
 
 Admin hiện có authority riêng và quyền kết thúc phiên. CRUD catalog/product và màn hình quản trị đầy đủ là milestone tiếp theo trong tài liệu Phase 4, không được mô tả nhầm là đã hoàn tất.
@@ -137,7 +147,7 @@ OmniBid/
 ├── contracts/wallet-proto/          # nguồn sự thật duy nhất cho gRPC contract
 ├── services/
 │   ├── identity-service/            # user/profile/RBAC/session/JWT/JWK
-│   ├── auction-service/             # auction/bid/Redis lock/event publisher
+│   ├── auction-service/             # auction/bid/Redis lock/outbox publisher
 │   ├── wallet-service/              # freeze/refund/top-up/withdraw/idempotency
 │   └── audit-service/               # Kafka -> MongoDB bid_logs
 ├── frontend/src/
@@ -205,7 +215,7 @@ $env:Path = "$env:JAVA_HOME\bin;$env:Path"
 mvn --batch-mode --no-transfer-progress clean verify
 ```
 
-Module `wallet-proto` dùng plugin Protobuf Maven đang được bảo trì và sinh cả Java message classes lẫn gRPC stubs trong cùng goal `generate`; lệnh `clean verify` đã được kiểm tra trên Windows/OneDrive và cũng là lệnh CI sử dụng trên Ubuntu.
+Module `wallet-proto` dùng plugin Protobuf Maven đang được bảo trì và sinh cả Java message classes lẫn gRPC stubs trong cùng goal `generate`. Auction/wallet integration tests dùng Testcontainers với PostgreSQL 16 và Redis 7.4, vì vậy Docker Desktop phải đang chạy khi thực thi `clean verify`. Đây cũng là lệnh CI sử dụng trên Ubuntu.
 
 ### 4. Chạy backend
 
@@ -235,6 +245,18 @@ Port mặc định:
 - Audit consumer: không expose HTTP ở module hiện tại; xác minh bằng log `Started AuditServiceApplication` và Kafka subscription.
 
 Nếu port `8080` bị phần mềm khác chiếm, có thể chạy application ports `28080/28081/28082/28083`. Khi đó issuer và JWK URL phải thống nhất giữa các service; xem `.env.local` để cấu hình frontend tương ứng.
+
+#### Xử lý password drift của PostgreSQL volume
+
+`POSTGRES_PASSWORD` chỉ được áp dụng khi volume PostgreSQL được khởi tạo lần đầu. Đổi `.env` sau đó không tự đổi password của role trong volume cũ. Ưu tiên khôi phục giá trị `.env` ban đầu. Với dữ liệu demo có thể bỏ, chạy `docker compose down -v` rồi `docker compose up -d` sẽ tạo volume mới nhưng **xóa toàn bộ database local**.
+
+Nếu cần giữ dữ liệu và bạn là chủ môi trường local, có thể chủ động đồng bộ role với giá trị trong `.env`:
+
+```powershell
+docker exec omnibid-postgres psql -U omnibid -d postgres -c "ALTER ROLE omnibid WITH PASSWORD 'omnibid';"
+```
+
+Không dùng mật khẩu demo này ngoài local và không chạy lệnh trên database dùng chung/production.
 
 ### 5. Chạy frontend
 
@@ -357,21 +379,23 @@ POST   /api/v1/me/wallet/withdrawals
 7. Audit consumer dùng `bidId` làm Mongo `_id`, nên Kafka redelivery không tạo bản ghi trùng.
 8. Refresh token không nằm trong JavaScript/localStorage và không lưu plaintext trong database.
 9. JWT access token không tạo một entry RAM cho mỗi user tại resource service; session bền vững nằm ở PostgreSQL.
+10. Bid/refund outbox row được commit cùng aggregate; broker outage để lại event pending và scheduled publisher retry theo semantics at-least-once.
+11. Flyway là nguồn sự thật của schema; Hibernate chỉ validate mapping khi service khởi động.
 
 ## Giới hạn và roadmap production
 
-- Bid DB commit và Kafka publish vẫn là dual-write; cần Transactional Outbox + CDC.
 - Freeze wallet trước auction commit cần saga/compensation và reconciliation job.
 - Ví hiện là balance + immutable transaction history, chưa phải double-entry ledger hoàn chỉnh.
 - RSA signing key được sinh khi identity-service khởi động trong local; production phải dùng PEM/KMS/Vault và key rotation.
 - Chưa có API Gateway, TLS/mTLS, rate limiting, OpenTelemetry, Prometheus/Grafana và centralized logs.
 - UI dùng polling 1.5 giây; milestone tiếp theo là SSE/WebSocket fan-out.
 - Product/catalog, ảnh S3, quản trị auction lifecycle và lịch sử thắng/thua đầy đủ nằm trong Phase 4 tiếp theo.
+- Outbox hiện dùng scheduled polling; quy mô lớn hơn nên cân nhắc Debezium/CDC, retry backoff, metrics và poison-event quarantine.
 
 ## Kiểm chứng hiện tại
 
 - Maven reactor: wallet proto + identity + auction + wallet + audit.
-- Unit tests cover refresh rotation/reuse detection, distributed bid lock path, wallet/refund idempotency và audit document.
+- Backend có **24 tests**: identity 6, auction 10, wallet 7, audit 1. Bộ này gồm Testcontainers PostgreSQL schema/idempotency tests và Redis contention test 20 luồng.
 - Frontend có `npm run typecheck` và production `npm run build`.
 
 ## GitHub
@@ -379,9 +403,9 @@ POST   /api/v1/me/wallet/withdrawals
 ```powershell
 git status
 git diff
-git add .
-git commit -m "feat: add identity, RBAC and personal wallet flows"
-git push -u origin main
+git add services/auction-service/src/main/resources/db
+git commit -m "build(db): manage auction schema with Flyway"
+git push origin develop
 ```
 
-Luôn kiểm tra diff và không commit `.env`, token, cookie hoặc secret thật.
+Đây chỉ là ví dụ stage theo phạm vi. Luôn kiểm tra diff, tránh `git add .` cho một working tree có nhiều concern, và không commit `.env`, token, cookie hoặc secret thật.
