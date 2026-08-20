@@ -59,6 +59,8 @@ management:
         include: health,info
 
 security:
+  cors:
+    allowed-origins: ${FRONTEND_ORIGINS:${FRONTEND_ORIGIN:http://localhost:3000}}
   jwt:
     jwk-set-uri: ${IDENTITY_JWK_SET_URI:http://localhost:8083/.well-known/jwks.json}
     issuer: ${OMNIBID_TOKEN_ISSUER:http://localhost:8083}
