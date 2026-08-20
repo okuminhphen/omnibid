@@ -21,6 +21,8 @@ Các chủ đề nổi bật để trình bày trong CV:
 
 Frontend polling mỗi 1,5 giây nên tên gọi chính xác hiện tại là near real-time. SSE/WebSocket là milestone tiếp theo.
 
+Deployment hiện tách frontend Next.js trên Vercel khỏi backend single-host Docker Compose. Bốn Java service dùng multi-stage/non-root image; Caddy edge profile cung cấp HTTPS cho ba public API subdomain, còn database/broker chỉ bind localhost.
+
 ## 2. Bounded context và data ownership
 
 | Service | Dữ liệu sở hữu | Trách nhiệm |
@@ -200,12 +202,13 @@ bid_logs (compound index auctionId ASC, timestamp DESC)
 | Kiểm tra | Kết quả |
 |---|---|
 | Maven reactor | 6/6 module `verify` thành công bằng JDK 21 |
-| Backend tests | 24 pass: identity 6, auction 10, wallet 7, audit 1 |
+| Backend tests | 26 pass: identity 8, auction 10, wallet 7, audit 1 |
 | Testcontainers | PostgreSQL 16 auction/wallet migrations + Redis 7.4 contention 20 luồng |
 | Identity security tests | hash-only refresh, rotation, reuse revokes family |
 | Frontend typecheck | Pass |
 | Next production build | Pass với 6 route |
 | Docker infrastructure | PostgreSQL/Mongo/Redis/Rabbit/Redpanda/LocalStack healthy |
+| Deployment config | Compose parse pass; 4 backend images + health dependencies + optional Caddy edge |
 
 `mvn clean verify` đã chạy thành công trên Windows/OneDrive bằng JDK 21. Docker Desktop phải hoạt động vì integration tests tạo PostgreSQL/Redis container tạm.
 

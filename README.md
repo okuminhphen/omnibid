@@ -25,6 +25,8 @@ Tài liệu chi tiết:
 - [REPOSITORY_AUDIT.md](docs/REPOSITORY_AUDIT.md): kết quả build/test/security hygiene, các sạn đã sửa và giới hạn production còn lại.
 - [FRESHER_HARDENING.md](docs/FRESHER_HARDENING.md): Flyway, outbox, lock watchdog, Testcontainers và kịch bản trình bày khi phỏng vấn.
 - [GITHUB_RELEASE_GUIDE.md](docs/GITHUB_RELEASE_GUIDE.md): quy trình push `develop`, mở PR, release `v1.0.0` và metadata GitHub.
+- [DEPLOYMENT.md](docs/DEPLOYMENT.md): backend Docker Compose/Caddy HTTPS và frontend Vercel.
+- [CV_BULLETS.md](docs/CV_BULLETS.md): bullet points Việt/Anh chỉ dùng các số liệu đã kiểm chứng.
 
 ## Kiến trúc
 
@@ -125,6 +127,7 @@ sequenceDiagram
 - Scheduler tự tìm tối đa 100 phiên `ACTIVE` hết hạn mỗi lượt và chốt qua cùng distributed lock với API thủ công.
 - Kafka audit log vào MongoDB; RabbitMQ refund có retry, DLQ, Redis fast dedupe và PostgreSQL durable dedupe.
 - Flyway sở hữu schema auction/wallet; Hibernate chạy `validate` thay vì tự sửa database bằng `ddl-auto=update`.
+- Bốn backend service có multi-stage Docker build, non-root/read-only runtime, health-gated startup và Caddy HTTPS profile tùy chọn.
 - UI polling gần real-time; có thể mở cửa sổ thường + ẩn danh để đấu giá bằng hai user khác nhau.
 
 Admin hiện có authority riêng và quyền kết thúc phiên. CRUD catalog/product và màn hình quản trị đầy đủ là milestone tiếp theo trong tài liệu Phase 4, không được mô tả nhầm là đã hoàn tất.
@@ -156,6 +159,7 @@ OmniBid/
 │   ├── app/wallet/                  # personal wallet dashboard
 │   └── app/auctions/[id]/           # real-time bid screen
 ├── infrastructure/postgres/init.sql # tạo identity/auction/wallet databases
+├── deploy/Caddyfile                  # optional public HTTPS edge for a VPS
 ├── docs/
 ├── docker-compose.yml
 └── pom.xml                          # Maven reactor gồm 6 modules
@@ -180,11 +184,18 @@ Copy-Item .env.example .env
 
 `.env` không được commit. Credential trong file mẫu chỉ dành cho local.
 
-### 2. Bật infrastructure
+### 2. Chạy toàn bộ backend bằng Docker Compose
 
 ```powershell
-docker compose up -d
+docker compose config --quiet
+docker compose up -d --build
 docker compose ps
+```
+
+Lệnh trên chạy Identity, Auction, Wallet, Audit và toàn bộ infrastructure. Nếu muốn phát triển Java bằng Maven, chỉ bật infrastructure:
+
+```powershell
+docker compose up -d postgres mongodb redis rabbitmq redpanda localstack
 ```
 
 Endpoint hạ tầng:
@@ -198,11 +209,14 @@ Endpoint hạ tầng:
 | RabbitMQ broker | `localhost:5672` |
 | RabbitMQ Management | `http://localhost:15672` |
 | LocalStack | `http://localhost:4566` |
+| Identity API | `http://localhost:8083` |
+| Auction API | `http://localhost:8080` |
+| Wallet API | `http://localhost:8081` |
 
 `init.sql` chỉ chạy lần đầu khi volume PostgreSQL rỗng. Nếu giữ volume từ phiên bản cũ, tạo database còn thiếu mà không xóa dữ liệu:
 
 ```powershell
-docker exec omnibid-postgres psql -U omnibid -d postgres -c "CREATE DATABASE identity_db"
+docker compose exec postgres psql -U omnibid -d postgres -c "CREATE DATABASE identity_db"
 ```
 
 Nếu database đã tồn tại, PostgreSQL sẽ báo lỗi `already exists` và không cần làm gì thêm. Không dùng `docker compose down -v` nếu muốn giữ dữ liệu local.
@@ -217,7 +231,7 @@ mvn --batch-mode --no-transfer-progress clean verify
 
 Module `wallet-proto` dùng plugin Protobuf Maven đang được bảo trì và sinh cả Java message classes lẫn gRPC stubs trong cùng goal `generate`. Auction/wallet integration tests dùng Testcontainers với PostgreSQL 16 và Redis 7.4, vì vậy Docker Desktop phải đang chạy khi thực thi `clean verify`. Đây cũng là lệnh CI sử dụng trên Ubuntu.
 
-### 4. Chạy backend
+### 4. Chạy backend trực tiếp bằng Maven (tùy chọn)
 
 Mở bốn terminal riêng, theo thứ tự sau:
 
@@ -253,7 +267,7 @@ Nếu port `8080` bị phần mềm khác chiếm, có thể chạy application 
 Nếu cần giữ dữ liệu và bạn là chủ môi trường local, có thể chủ động đồng bộ role với giá trị trong `.env`:
 
 ```powershell
-docker exec omnibid-postgres psql -U omnibid -d postgres -c "ALTER ROLE omnibid WITH PASSWORD 'omnibid';"
+docker compose exec postgres psql -U omnibid -d postgres -c "ALTER ROLE omnibid WITH PASSWORD 'omnibid';"
 ```
 
 Không dùng mật khẩu demo này ngoài local và không chạy lệnh trên database dùng chung/production.
@@ -276,6 +290,8 @@ NEXT_PUBLIC_IDENTITY_API_URL=http://localhost:8083
 ```
 
 Mở `http://localhost:3000`.
+
+Production frontend không dùng Dockerfile. Import monorepo vào Vercel, đặt Root Directory là `frontend` và cấu hình ba biến `NEXT_PUBLIC_*`; xem [Deployment Guide](docs/DEPLOYMENT.md).
 
 ## Google One Tap
 
@@ -391,11 +407,12 @@ POST   /api/v1/me/wallet/withdrawals
 - UI dùng polling 1.5 giây; milestone tiếp theo là SSE/WebSocket fan-out.
 - Product/catalog, ảnh S3, quản trị auction lifecycle và lịch sử thắng/thua đầy đủ nằm trong Phase 4 tiếp theo.
 - Outbox hiện dùng scheduled polling; quy mô lớn hơn nên cân nhắc Debezium/CDC, retry backoff, metrics và poison-event quarantine.
+- Docker Compose hiện là single-host deployment; database/broker chưa high availability và Identity signing key chưa được persist qua KMS/Vault.
 
 ## Kiểm chứng hiện tại
 
 - Maven reactor: wallet proto + identity + auction + wallet + audit.
-- Backend có **24 tests**: identity 6, auction 10, wallet 7, audit 1. Bộ này gồm Testcontainers PostgreSQL schema/idempotency tests và Redis contention test 20 luồng.
+- Backend có **26 tests**: identity 8, auction 10, wallet 7, audit 1. Bộ này gồm Testcontainers PostgreSQL schema/idempotency tests, kiểm tra cấu hình cookie bảo mật và Redis contention test 20 luồng.
 - Frontend có `npm run typecheck` và production `npm run build`.
 
 ## GitHub

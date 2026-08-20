@@ -18,7 +18,7 @@ Badge CI trên README chỉ chuyển sang trạng thái thực sau khi nhánh `d
 | --- | --- | --- |
 | Backend toolchain | JDK 21.0.1, Maven 3.9.12 | Pass |
 | Backend reactor | `mvn --batch-mode --no-transfer-progress clean verify` | Pass, 6/6 reactor projects |
-| Backend tests | Identity 6, Auction 10, Wallet 7, Audit 1 | Pass, **24/24**, 0 failure/error/skipped |
+| Backend tests | Identity 8, Auction 10, Wallet 7, Audit 1 | Pass, **26/26**, 0 failure/error/skipped |
 | PostgreSQL integration | Auction/wallet Flyway migrations và unique idempotency constraints trên PostgreSQL 16 Testcontainers | Pass |
 | Redis concurrency | 20 contenders dùng Redisson lock trên Redis 7.4 Testcontainers | Pass, max critical-section concurrency = 1 |
 | Frontend toolchain | Node.js 20.20.2 | Pass |
@@ -26,6 +26,8 @@ Badge CI trên README chỉ chuyển sang trạng thái thực sau khi nhánh `d
 | TypeScript | `npm run typecheck` | Pass |
 | Next.js production | `npm run build` | Pass, 6 routes generated |
 | Docker Compose | `docker compose config --quiet` | Pass |
+| Backend packaging | 4 multi-stage Java images, non-root UID 10001, read-only rootfs, health-gated startup | Configured |
+| Frontend deployment | Vercel project config under `frontend/`; Docker image intentionally removed | Configured |
 | Patch hygiene | `git diff --check` | Pass |
 | Tracked artifacts | `target/`, `node_modules/`, `.next/`, `.class`, `.jar` | Không có artifact bị track |
 | Secret signatures | Private-key headers, GitHub/OpenAI/Google key patterns | Không phát hiện trong tracked files |

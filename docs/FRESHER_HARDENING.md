@@ -51,11 +51,11 @@ Refund outbox ID được tạo xác định từ wallet transaction ID. Gọi e
 
 ## 5. Integration và concurrency tests
 
-Full backend hiện có **24 tests**:
+Full backend hiện có **26 tests**:
 
 | Module | Tests | Nội dung nổi bật |
 | --- | ---: | --- |
-| Identity | 6 | refresh rotation, reuse detection, token hashing, origin filter |
+| Identity | 8 | refresh rotation, reuse detection, token hashing, origin filter, cookie policy validation |
 | Auction | 10 | controller, outbox success/failure, scheduler, bid core, PostgreSQL schema, Redis contention |
 | Wallet | 7 | balance invariant, account commands, refund idempotency, PostgreSQL schema |
 | Audit | 1 | idempotent Mongo document identity |
@@ -91,7 +91,7 @@ npm run build
 Kết quả đã xác minh trong đợt hardening này:
 
 - Maven reactor: 6/6 project thành công.
-- Backend: 24/24 test pass, 0 failure/error/skipped.
+- Backend: 26/26 test pass, 0 failure/error/skipped.
 - Frontend typecheck: pass.
 - Next.js production build: pass, 6 routes.
 - Docker infrastructure: 6/6 container healthy.
