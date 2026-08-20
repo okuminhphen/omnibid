@@ -14,6 +14,7 @@ import com.omnibid.auction.repository.AuctionRepository;
 import com.omnibid.auction.repository.BidRepository;
 import com.omnibid.contract.wallet.v1.FreezeDepositResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -33,18 +34,17 @@ import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AuctionServiceImpl implements AuctionService {
 
     private static final long LOCK_WAIT_SECONDS = 3;
-    private static final long LOCK_LEASE_SECONDS = 5;
 
     private final RedissonClient redissonClient;
     private final AuctionRepository auctionRepository;
     private final BidRepository bidRepository;
     private final WalletClient walletClient;
     private final StringRedisTemplate redisTemplate;
-    private final KafkaProducerService kafkaProducerService;
-    private final RabbitMQPublisherService rabbitMQPublisherService;
+    private final AuctionOutboxService auctionOutboxService;
     private final TransactionTemplate transactionTemplate;
 
     @Override
@@ -60,11 +60,9 @@ public class AuctionServiceImpl implements AuctionService {
         RLock lock = redissonClient.getLock(lockKey);
 
         try {
-            boolean acquired = lock.tryLock(
-                    LOCK_WAIT_SECONDS,
-                    LOCK_LEASE_SECONDS,
-                    TimeUnit.SECONDS
-            );
+            // Omitting a fixed lease enables Redisson's watchdog renewal. The lock
+            // cannot expire midway through a slow gRPC or database operation.
+            boolean acquired = lock.tryLock(LOCK_WAIT_SECONDS, TimeUnit.SECONDS);
             if (!acquired) {
                 throw new BidConcurrencyException("Hệ thống đang quá tải, vui lòng thử lại!");
             }
@@ -89,8 +87,13 @@ public class AuctionServiceImpl implements AuctionService {
 
             if (result.event() != null) {
                 String priceCacheKey = "cache:auction:" + auctionId + ":price";
-                redisTemplate.opsForValue().set(priceCacheKey, bidAmount.toPlainString());
-                kafkaProducerService.sendBidEvent(result.event());
+                try {
+                    redisTemplate.opsForValue().set(priceCacheKey, bidAmount.toPlainString());
+                } catch (RuntimeException exception) {
+                    // Redis price data is a disposable cache. The committed database
+                    // result remains successful and the next read can repopulate it.
+                    log.warn("Could not update price cache for auction {}", auctionId, exception);
+                }
             }
 
             return result.response();
@@ -115,11 +118,7 @@ public class AuctionServiceImpl implements AuctionService {
         EndResult result;
 
         try {
-            boolean acquired = lock.tryLock(
-                    LOCK_WAIT_SECONDS,
-                    LOCK_LEASE_SECONDS,
-                    TimeUnit.SECONDS
-            );
+            boolean acquired = lock.tryLock(LOCK_WAIT_SECONDS, TimeUnit.SECONDS);
             if (!acquired) {
                 throw new BidConcurrencyException("Hệ thống đang quá tải, vui lòng thử lại!");
             }
@@ -141,9 +140,6 @@ public class AuctionServiceImpl implements AuctionService {
             }
         }
 
-        // Publish after the auction transaction commits. Repeating /end is safe:
-        // it republishes the same transactionIds and the wallet consumer deduplicates them.
-        result.refundCommands().forEach(rabbitMQPublisherService::sendRefundCommand);
         return new EndAuctionResponse(
                 result.auctionId(),
                 result.status(),
@@ -219,6 +215,9 @@ public class AuctionServiceImpl implements AuctionService {
                 bidAmount,
                 now
         );
+        // The bid and its event are committed atomically. The scheduled outbox
+        // publisher performs at-least-once Kafka delivery after this transaction.
+        auctionOutboxService.enqueueBidPlaced(event);
         return new PlacementResult(toResponse(bid), event);
     }
 
@@ -249,6 +248,8 @@ public class AuctionServiceImpl implements AuctionService {
                     )
             );
         }
+
+        losingUsers.values().forEach(auctionOutboxService::enqueueRefund);
 
         return new EndResult(
                 auction.getId(),

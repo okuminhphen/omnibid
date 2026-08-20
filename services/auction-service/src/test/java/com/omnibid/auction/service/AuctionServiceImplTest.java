@@ -37,9 +37,7 @@ class AuctionServiceImplTest {
     @Mock
     private StringRedisTemplate redisTemplate;
     @Mock
-    private KafkaProducerService kafkaProducerService;
-    @Mock
-    private RabbitMQPublisherService rabbitMQPublisherService;
+    private AuctionOutboxService auctionOutboxService;
     @Mock
     private TransactionTemplate transactionTemplate;
     @Mock
@@ -55,7 +53,7 @@ class AuctionServiceImplTest {
         String lockKey = "lock:auction:" + auctionId;
 
         when(redissonClient.getLock(lockKey)).thenReturn(lock);
-        when(lock.tryLock(3, 5, TimeUnit.SECONDS)).thenReturn(false);
+        when(lock.tryLock(3, TimeUnit.SECONDS)).thenReturn(false);
 
         assertThatThrownBy(() -> service.placeBid(
                 auctionId,
@@ -66,7 +64,7 @@ class AuctionServiceImplTest {
                 .isInstanceOf(BidConcurrencyException.class)
                 .hasMessage("Hệ thống đang quá tải, vui lòng thử lại!");
 
-        verify(lock).tryLock(3, 5, TimeUnit.SECONDS);
+        verify(lock).tryLock(3, TimeUnit.SECONDS);
         verify(lock, never()).unlock();
     }
 }
