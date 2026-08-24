@@ -65,7 +65,7 @@ export function GoogleOneTap({ onSuccess }: { onSuccess: () => void }) {
       type: "standard",
       theme: "outline",
       size: "large",
-      shape: "pill",
+      shape: "rectangular",
       text: "continue_with",
       width: "360"
     });
@@ -80,8 +80,8 @@ export function GoogleOneTap({ onSuccess }: { onSuccess: () => void }) {
 
   if (config && !config.enabled) {
     return (
-      <p className="rounded-xl bg-slate-100 px-4 py-3 text-center text-xs leading-5 text-slate-500">
-        Google One Tap đang tắt ở local. Điền <code>GOOGLE_CLIENT_ID</code> để bật.
+      <p className="border border-amber-200 bg-amber-50 px-4 py-3 text-center text-xs leading-5 text-amber-800">
+        Đăng nhập Google chưa được cấu hình cho môi trường này. Xem hướng dẫn thiết lập trong README.
       </p>
     );
   }
