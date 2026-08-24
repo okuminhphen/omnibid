@@ -27,7 +27,7 @@ Deployment hiện tách frontend Next.js trên Vercel khỏi backend single-host
 
 | Service | Dữ liệu sở hữu | Trách nhiệm |
 |---|---|---|
-| Identity | user, provider identity, profile, role, auth session, auth event | Google login, local lab accounts, ký JWT, rotate/revoke session |
+| Identity | user, provider identity, profile, role, auth session, auth event | Google sign-in-or-sign-up, admin bootstrap, ký JWT, rotate/revoke session |
 | Auction | auction, bid, winner, current price | validate bid, concurrency control, end auction, phát event/command |
 | Wallet | wallet, frozen balance, wallet transaction | top-up/withdraw demo, freeze/refund, financial idempotency |
 | Audit | bid audit log | consume Kafka và lưu history phục vụ truy vết/phân tích |
@@ -150,14 +150,14 @@ Mọi mutation dùng `BigDecimal`/`NUMERIC`, row lock và immutable-ish transact
 
 Next.js 16 App Router + React 19 gồm:
 
-- `/login`: Google One Tap và account local A/B/Admin.
+- `/login`: Google sign-in-or-sign-up; user mới được tạo với role CUSTOMER.
 - `/profile`: cập nhật hồ sơ, xem và revoke session.
 - `/wallet`: ví của user đăng nhập, nạp/rút demo và transaction history.
 - `/auctions/[id]`: countdown, current price, bid form và anonymous bid history.
 
 Axios tự gắn Bearer token, tạo `X-Idempotency-Key` cho command và chỉ thử refresh một lần khi gặp 401. Refresh token không thể đọc từ JavaScript.
 
-Để mô phỏng concurrency, đăng nhập Customer A ở cửa sổ thường và Customer B trong cửa sổ ẩn danh rồi bid cùng auction.
+Để mô phỏng concurrency, đăng nhập hai Google account ở cửa sổ thường và cửa sổ ẩn danh rồi bid cùng auction.
 
 ## 8. Database chính
 
@@ -166,7 +166,7 @@ Identity migration quản lý:
 ```text
 users
 user_identities
-profiles
+user_profiles
 roles
 user_roles
 auth_sessions
@@ -202,7 +202,7 @@ bid_logs (compound index auctionId ASC, timestamp DESC)
 | Kiểm tra | Kết quả |
 |---|---|
 | Maven reactor | 6/6 module `verify` thành công bằng JDK 21 |
-| Backend tests | 26 pass: identity 8, auction 10, wallet 7, audit 1 |
+| Backend tests | 30 pass: identity 12, auction 10, wallet 7, audit 1 |
 | Testcontainers | PostgreSQL 16 auction/wallet migrations + Redis 7.4 contention 20 luồng |
 | Identity security tests | hash-only refresh, rotation, reuse revokes family |
 | Frontend typecheck | Pass |

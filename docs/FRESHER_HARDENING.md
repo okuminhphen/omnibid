@@ -51,11 +51,11 @@ Refund outbox ID được tạo xác định từ wallet transaction ID. Gọi e
 
 ## 5. Integration và concurrency tests
 
-Full backend hiện có **26 tests**:
+Full backend hiện có **30 tests**:
 
 | Module | Tests | Nội dung nổi bật |
 | --- | ---: | --- |
-| Identity | 8 | refresh rotation, reuse detection, token hashing, origin filter, cookie policy validation |
+| Identity | 12 | refresh rotation, reuse detection, token hashing, origin filter, cookie policy, admin bootstrap/claim, PostgreSQL schema |
 | Auction | 10 | controller, outbox success/failure, scheduler, bid core, PostgreSQL schema, Redis contention |
 | Wallet | 7 | balance invariant, account commands, refund idempotency, PostgreSQL schema |
 | Audit | 1 | idempotent Mongo document identity |

@@ -21,6 +21,8 @@ OmniBid là monorepo sàn đấu giá gần real-time phục vụ học tập v�
 Tài liệu chi tiết:
 
 - [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md): phân tích hệ thống, luồng dữ liệu và giới hạn hiện tại.
+- [PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md): cây thư mục, module ownership và điểm bắt đầu khi đọc code.
+- [DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md): ERD, bảng, index và invariant của từng database.
 - [PHASE_4_IDENTITY_AND_MARKETPLACE_DESIGN.md](docs/PHASE_4_IDENTITY_AND_MARKETPLACE_DESIGN.md): thiết kế schema user/session, RBAC, Google One Tap và roadmap marketplace.
 - [REPOSITORY_AUDIT.md](docs/REPOSITORY_AUDIT.md): kết quả build/test/security hygiene, các sạn đã sửa và giới hạn production còn lại.
 - [FRESHER_HARDENING.md](docs/FRESHER_HARDENING.md): Flyway, outbox, lock watchdog, Testcontainers và kịch bản trình bày khi phỏng vấn.
@@ -85,7 +87,7 @@ sequenceDiagram
     I-->>UI: JWT 10 phút + rotating HttpOnly refresh cookie
 ```
 
-Google `sub` là external identity ổn định; email không được dùng để tự động link account. Role chỉ lấy từ `identity_db`, không tin role do client hoặc Google gửi lên.
+Google `sub` là external identity ổn định; email không được dùng để tự động link account thông thường. Ngoại lệ duy nhất là account ADMIN chưa có provider identity được provision từ `OMNIBID_ADMIN_EMAIL`: một Google credential có email trùng khớp và đã verify được phép claim account đó đúng một lần. Role chỉ lấy từ `identity_db`, không tin role do client hoặc Google gửi lên.
 
 ### Luồng đặt giá
 
@@ -115,7 +117,8 @@ sequenceDiagram
 
 ## Chức năng hiện có
 
-- Tài khoản riêng với Google One Tap hoặc ba account local dành cho concurrency lab.
+- Google One Tap theo luồng sign-in-or-sign-up: email mới tự tạo account `CUSTOMER`; không có password hay account mock.
+- Account `ADMIN` được bootstrap từ environment, lưu trong PostgreSQL và chỉ liên kết với Google identity đã verify.
 - Access token RS256 sống ngắn; refresh token opaque trong HttpOnly cookie, chỉ lưu hash và rotate sau mỗi lần dùng.
 - Phát hiện reuse refresh token và revoke toàn bộ token family.
 - RBAC `CUSTOMER`/`ADMIN`; auction và wallet không nhận `userId` từ request body của customer.
@@ -154,7 +157,7 @@ OmniBid/
 │   ├── wallet-service/              # freeze/refund/top-up/withdraw/idempotency
 │   └── audit-service/               # Kafka -> MongoDB bid_logs
 ├── frontend/src/
-│   ├── app/login/                   # Google One Tap + local concurrency users
+│   ├── app/login/                   # Google sign-in-or-sign-up
 │   ├── app/profile/                 # profile + session management
 │   ├── app/wallet/                  # personal wallet dashboard
 │   └── app/auctions/[id]/           # real-time bid screen
@@ -293,9 +296,11 @@ Mở `http://localhost:3000`.
 
 Production frontend không dùng Dockerfile. Import monorepo vào Vercel, đặt Root Directory là `frontend` và cấu hình ba biến `NEXT_PUBLIC_*`; xem [Deployment Guide](docs/DEPLOYMENT.md).
 
-## Google One Tap
+## Google One Tap, đăng ký customer và bootstrap admin
 
-Local chạy được ngay bằng account dev mà không cần Google credential. Để bật Google thật:
+Project không có tài khoản hoặc endpoint đăng nhập mock. Mỗi customer tự đăng ký bằng Google: Google `sub` mới được backend tạo thành account `CUSTOMER` và phát `UserRegistered` để wallet-service provision ví.
+
+Để bật Google thật:
 
 1. Tạo OAuth 2.0 Web Client trong Google Cloud Console.
 2. Thêm `http://localhost:3000` vào Authorized JavaScript origins.
@@ -304,67 +309,29 @@ Local chạy được ngay bằng account dev mà không cần Google credential
 ```powershell
 $env:GOOGLE_AUTH_ENABLED = "true"
 $env:GOOGLE_CLIENT_ID = "<your-web-client-id>"
+$env:OMNIBID_ADMIN_EMAIL = "<google-email-cua-admin>"
+$env:OMNIBID_ADMIN_DISPLAY_NAME = "OmniBid Administrator"
 mvn -pl services/identity-service spring-boot:run
 ```
 
-Nếu deploy bằng container/orchestrator, truyền hai biến cùng tên vào container. File `.env` ở root được Docker Compose dùng để nội suy, Maven không tự động import file này.
+Nếu chạy Docker Compose, đặt bốn biến trên trong `.env` rồi rebuild `identity-service`. `OMNIBID_ADMIN_EMAIL` không phải secret nhưng là cấu hình đặc quyền: người kiểm soát deployment mới được thay đổi. Identity service tạo account ADMIN trong `identity_db` mà không tạo password. Lần đầu đúng Google email đó đăng nhập, backend liên kết provider identity đã verify vào account ADMIN.
 
 Backend luôn verify signature, issuer, audience, expiration và nonce của Google credential. Không đưa Google client secret vào frontend; One Tap web flow dùng public client ID.
 
 ## Test nhiều người đấu giá
 
-Project có ba account chỉ bật ở Spring profile `local`:
-
-| Alias | User ID | Role |
-|---|---|---|
-| `customer-a` | `22222222-2222-2222-2222-222222222222` | CUSTOMER |
-| `customer-b` | `33333333-3333-3333-3333-333333333333` | CUSTOMER |
-| `admin` | `99999999-9999-9999-9999-999999999999` | ADMIN |
-
-1. Mở `http://localhost:3000/login` ở cửa sổ thường, chọn Customer A.
-2. Mở cửa sổ ẩn danh, chọn Customer B.
+1. Mở `http://localhost:3000/login` ở cửa sổ thường và đăng nhập Google account thứ nhất.
+2. Mở cửa sổ ẩn danh và đăng nhập Google account thứ hai; backend tự đăng ký hai customer độc lập.
 3. Nạp tiền demo ở `/wallet` cho cả hai.
 4. Mở cùng auction và đặt giá gần như đồng thời.
 5. Quan sát chỉ một request tại một thời điểm đi qua `lock:auction:{auctionId}`; request còn lại đọc giá mới trước khi validate.
 
-### Test API bằng PowerShell
-
-```powershell
-$loginBody = @{ alias = "customer-a" } | ConvertTo-Json
-$login = Invoke-RestMethod `
-  -Method Post `
-  -Uri "http://localhost:8083/api/v1/auth/dev/login" `
-  -SessionVariable authSession `
-  -ContentType "application/json" `
-  -Body $loginBody
-
-$headers = @{
-  Authorization = "Bearer $($login.accessToken)"
-  "X-Idempotency-Key" = [guid]::NewGuid().ToString()
-}
-
-Invoke-RestMethod `
-  -Method Post `
-  -Uri "http://localhost:8081/api/v1/me/wallet/top-ups" `
-  -Headers $headers `
-  -ContentType "application/json" `
-  -Body (@{ amount = 500000 } | ConvertTo-Json)
-
-Invoke-RestMethod `
-  -Method Post `
-  -Uri "http://localhost:8080/api/v1/auctions/11111111-1111-1111-1111-111111111111/bid" `
-  -Headers $headers `
-  -ContentType "application/json" `
-  -Body (@{ bidAmount = 180 } | ConvertTo-Json)
-```
-
-Lưu ý: bid request không có `userId`; backend lấy user từ JWT `sub`.
+Access token chỉ nằm trong memory của frontend. Integration test backend dùng signed test JWT; không thêm backdoor login chỉ để tiện Postman. Bid request không có `userId`; backend lấy user từ JWT `sub`.
 
 ## API chính
 
 ```text
 POST   /api/v1/auth/google
-POST   /api/v1/auth/dev/login                  # local profile only
 POST   /api/v1/auth/refresh
 POST   /api/v1/auth/logout
 GET    /api/v1/me
@@ -412,7 +379,7 @@ POST   /api/v1/me/wallet/withdrawals
 ## Kiểm chứng hiện tại
 
 - Maven reactor: wallet proto + identity + auction + wallet + audit.
-- Backend có **26 tests**: identity 8, auction 10, wallet 7, audit 1. Bộ này gồm Testcontainers PostgreSQL schema/idempotency tests, kiểm tra cấu hình cookie bảo mật và Redis contention test 20 luồng.
+- Backend có **30 tests**: identity 12, auction 10, wallet 7, audit 1. Bộ này gồm Testcontainers PostgreSQL schema/idempotency tests, kiểm tra cấu hình cookie bảo mật, bootstrap admin và Redis contention test 20 luồng.
 - Frontend có `npm run typecheck` và production `npm run build`.
 
 ## GitHub

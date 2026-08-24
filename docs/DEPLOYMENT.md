@@ -56,9 +56,12 @@ OMNIBID_TOKEN_ISSUER=https://identity.example.com
 FRONTEND_ORIGINS=https://app.example.com
 AUTH_COOKIE_SECURE=true
 AUTH_COOKIE_SAME_SITE=Lax
+GOOGLE_AUTH_ENABLED=true
+GOOGLE_CLIENT_ID=<google-web-client-id>
+OMNIBID_ADMIN_EMAIL=<verified-google-email-for-admin>
 ```
 
-`IDENTITY_ACTIVE_PROFILE=production` là bắt buộc trên host public: profile này làm `DevAuthController` không được tạo, nên các alias `customer-a`, `customer-b`, `admin` chỉ tồn tại trong local demo.
+Không có `DevAuthController` hoặc tài khoản mock ở bất kỳ profile nào. `OMNIBID_ADMIN_EMAIL` là cấu hình đặc quyền của deployment: identity-service provision account ADMIN vào PostgreSQL và chỉ cho Google credential có email trùng khớp, đã verify claim account đó.
 
 Tạo ba DNS `A/AAAA` record trỏ về VPS:
 

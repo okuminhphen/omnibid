@@ -86,7 +86,7 @@ Next.js 16 tự tái tạo `next-env.d.ts` với đường dẫn khác nhau gi�
 4. Redis idempotency là lớp chống duplicate nhanh nhưng chưa thay thế unique constraint/transaction ledger bền vững cho mọi financial command.
 5. FreezeDeposit gRPC thành công trước khi auction transaction commit vẫn cần compensation/reconciliation nếu DB commit thất bại.
 6. Admin đã có role boundary và quyền kết thúc auction, nhưng product/catalog CRUD, moderation, media upload và admin dashboard đầy đủ vẫn là roadmap.
-7. Google One Tap cần một Google Web Client ID thực và HTTPS origin khi deploy; dev login phải tắt ngoài local profile.
+7. Google One Tap cần một Google Web Client ID thực và HTTPS origin khi deploy; project không cung cấp dev-login backdoor ở bất kỳ profile nào.
 8. Chưa có Kubernetes manifests, secret manager, TLS/mTLS, OpenTelemetry collector, metrics/alerts, SLO, backup/restore drill hoặc disaster-recovery runbook.
 9. Ví chỉ mô phỏng internal credits, không kết nối ngân hàng, payment gateway, KYC/AML hoặc sổ cái kế toán kép.
 
