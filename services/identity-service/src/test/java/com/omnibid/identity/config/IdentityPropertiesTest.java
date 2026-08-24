@@ -35,6 +35,7 @@ class IdentityPropertiesTest {
                 sameSite,
                 List.of("https://omnibid.vercel.app"),
                 new IdentityProperties.Google(false, "", "https://example.com/jwks"),
+                new IdentityProperties.Admin("admin@example.com", "Administrator"),
                 new IdentityProperties.Kafka("identity-events")
         );
     }

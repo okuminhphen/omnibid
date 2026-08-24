@@ -49,5 +49,8 @@ omnibid:
       enabled: ${GOOGLE_AUTH_ENABLED:false}
       client-id: ${GOOGLE_CLIENT_ID:}
       jwk-set-uri: https://www.googleapis.com/oauth2/v3/certs
+    admin:
+      email: ${OMNIBID_ADMIN_EMAIL:}
+      display-name: ${OMNIBID_ADMIN_DISPLAY_NAME:OmniBid Administrator}
     kafka:
       identity-topic: ${IDENTITY_TOPIC:identity-events}

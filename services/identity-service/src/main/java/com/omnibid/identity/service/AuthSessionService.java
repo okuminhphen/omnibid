@@ -106,7 +106,10 @@ public class AuthSessionService {
 
     @Transactional(readOnly = true)
     public List<AuthSession> listSessions(UUID userId) {
-        return sessionRepository.findAllByUserIdOrderByCreatedAtDesc(userId);
+        return sessionRepository.findTop20ByUserIdAndStatusOrderByCreatedAtDesc(
+                userId,
+                AuthSessionStatus.ACTIVE
+        );
     }
 
     private SessionToken createSession(

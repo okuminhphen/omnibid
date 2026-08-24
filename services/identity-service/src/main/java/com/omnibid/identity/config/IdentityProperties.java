@@ -16,6 +16,7 @@ public record IdentityProperties(
         String refreshCookieSameSite,
         List<String> allowedOrigins,
         Google google,
+        Admin admin,
         Kafka kafka
 ) {
     public IdentityProperties {
@@ -43,6 +44,19 @@ public record IdentityProperties(
     }
 
     public record Google(boolean enabled, String clientId, String jwkSetUri) {
+    }
+
+    public record Admin(String email, String displayName) {
+        public Admin {
+            email = email == null ? "" : email.trim().toLowerCase();
+            displayName = displayName == null || displayName.isBlank()
+                    ? "OmniBid Administrator"
+                    : displayName.trim();
+        }
+
+        public boolean configured() {
+            return !email.isBlank();
+        }
     }
 
     public record Kafka(String identityTopic) {

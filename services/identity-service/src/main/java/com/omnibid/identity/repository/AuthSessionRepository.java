@@ -23,7 +23,10 @@ public interface AuthSessionRepository extends JpaRepository<AuthSession, UUID> 
     @Query("select session from AuthSession session where session.refreshTokenHash = :refreshTokenHash")
     Optional<AuthSession> findForUpdateByRefreshTokenHash(String refreshTokenHash);
 
-    List<AuthSession> findAllByUserIdOrderByCreatedAtDesc(UUID userId);
+    List<AuthSession> findTop20ByUserIdAndStatusOrderByCreatedAtDesc(
+            UUID userId,
+            AuthSessionStatus status
+    );
 
     @Modifying
     @Query("""

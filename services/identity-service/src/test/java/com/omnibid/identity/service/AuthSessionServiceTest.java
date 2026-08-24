@@ -55,6 +55,7 @@ class AuthSessionServiceTest {
                 "Lax",
                 List.of("http://localhost:3000"),
                 new IdentityProperties.Google(false, "", "https://example.test/jwks"),
+                new IdentityProperties.Admin("admin@example.test", "Administrator"),
                 new IdentityProperties.Kafka("identity-events")
         );
         service = new AuthSessionService(

@@ -2,6 +2,7 @@ package com.omnibid.identity.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.omnibid.identity.config.IdentityProperties;
 import com.omnibid.identity.domain.IdentityOutboxEvent;
 import com.omnibid.identity.domain.IdentityProvider;
 import com.omnibid.identity.domain.Role;
@@ -31,16 +32,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class UserAccountService {
 
-    public static final UUID CUSTOMER_A_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
-    public static final UUID CUSTOMER_B_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
-    public static final UUID ADMIN_ID = UUID.fromString("99999999-9999-9999-9999-999999999999");
-
     private final UserAccountRepository userRepository;
     private final UserIdentityRepository identityRepository;
     private final UserProfileRepository profileRepository;
     private final RoleRepository roleRepository;
     private final IdentityOutboxEventRepository outboxRepository;
     private final ObjectMapper objectMapper;
+    private final IdentityProperties properties;
 
     @Transactional
     public AuthenticatedUser findOrCreateGoogle(GoogleCredentialService.GooglePrincipal principal) {
@@ -55,7 +53,13 @@ public class UserAccountService {
             return new AuthenticatedUser(user, requireProfile(user.getId()));
         }
 
-        if (userRepository.findByPrimaryEmailIgnoreCase(principal.email()).isPresent()) {
+        UserAccount accountWithEmail = userRepository.findByPrimaryEmailIgnoreCase(principal.email()).orElse(null);
+        if (accountWithEmail != null) {
+            if (canClaimBootstrapAdmin(accountWithEmail, principal)) {
+                attachGoogleIdentity(accountWithEmail.getId(), principal);
+                accountWithEmail.setLastLoginAt(Instant.now());
+                return new AuthenticatedUser(accountWithEmail, requireProfile(accountWithEmail.getId()));
+            }
             throw new AccountLinkRequiredException(
                     "An account already uses this email. Sign in to that account before linking Google."
             );
@@ -72,54 +76,39 @@ public class UserAccountService {
                 IdentityProvider.GOOGLE,
                 principal.subject(),
                 principal.emailVerified(),
-                RoleCode.CUSTOMER
+                isBootstrapAdminEmail(principal.email()) ? RoleCode.ADMIN : RoleCode.CUSTOMER
         );
     }
 
     @Transactional
-    public AuthenticatedUser findOrCreateDevUser(String alias) {
-        DevIdentity dev = switch (alias.toLowerCase()) {
-            case "customer-a" -> new DevIdentity(
-                    CUSTOMER_A_ID,
-                    "customer-a@omnibid.local",
-                    "Người dùng A",
-                    RoleCode.CUSTOMER
-            );
-            case "customer-b" -> new DevIdentity(
-                    CUSTOMER_B_ID,
-                    "customer-b@omnibid.local",
-                    "Người dùng B",
-                    RoleCode.CUSTOMER
-            );
-            case "admin" -> new DevIdentity(
-                    ADMIN_ID,
-                    "admin@omnibid.local",
-                    "OmniBid Admin",
-                    RoleCode.ADMIN
-            );
-            default -> throw new IllegalArgumentException("Unknown local user alias: " + alias);
-        };
+    public UUID provisionAdmin(String email, String displayName) {
+        String normalizedEmail = email.trim().toLowerCase();
+        Role adminRole = roleRepository.findByCode(RoleCode.ADMIN)
+                .orElseThrow(() -> new IllegalStateException("ADMIN role is not seeded"));
 
-        UserIdentity identity = identityRepository
-                .findByProviderAndProviderSubject(IdentityProvider.LOCAL_DEV, alias.toLowerCase())
-                .orElse(null);
-        if (identity != null) {
-            identity.setLastUsedAt(Instant.now());
-            UserAccount user = requireActiveUser(identity.getUserId());
-            user.setLastLoginAt(Instant.now());
-            return new AuthenticatedUser(user, requireProfile(user.getId()));
+        UserAccount existing = userRepository.findByPrimaryEmailIgnoreCase(normalizedEmail).orElse(null);
+        if (existing != null) {
+            existing.getRoles().add(adminRole);
+            return existing.getId();
         }
 
-        return createUser(
-                dev.id(),
-                dev.email(),
-                dev.displayName(),
-                null,
-                IdentityProvider.LOCAL_DEV,
-                alias.toLowerCase(),
-                true,
-                dev.role()
-        );
+        UUID userId = UUID.randomUUID();
+        UserAccount user = new UserAccount();
+        user.setId(userId);
+        user.setPrimaryEmail(normalizedEmail);
+        user.setStatus(UserStatus.ACTIVE);
+        user.getRoles().add(adminRole);
+        userRepository.saveAndFlush(user);
+
+        UserProfile profile = new UserProfile();
+        profile.setUserId(userId);
+        profile.setDisplayName(displayName.trim());
+        profile.setLocale("vi-VN");
+        profile.setTimezone("Asia/Ho_Chi_Minh");
+        profileRepository.save(profile);
+
+        createUserRegisteredOutbox(userId);
+        return userId;
     }
 
     @Transactional(readOnly = true)
@@ -204,6 +193,36 @@ public class UserAccountService {
         }
     }
 
+    private void attachGoogleIdentity(
+            UUID userId,
+            GoogleCredentialService.GooglePrincipal principal
+    ) {
+        UserIdentity identity = new UserIdentity();
+        identity.setId(UUID.randomUUID());
+        identity.setUserId(userId);
+        identity.setProvider(IdentityProvider.GOOGLE);
+        identity.setProviderSubject(principal.subject());
+        identity.setProviderEmail(principal.email().toLowerCase());
+        identity.setEmailVerified(principal.emailVerified());
+        identity.setLastUsedAt(Instant.now());
+        identityRepository.save(identity);
+    }
+
+    private boolean canClaimBootstrapAdmin(
+            UserAccount user,
+            GoogleCredentialService.GooglePrincipal principal
+    ) {
+        return principal.emailVerified()
+                && isBootstrapAdminEmail(principal.email())
+                && user.getRoles().stream().anyMatch(role -> role.getCode() == RoleCode.ADMIN)
+                && !identityRepository.existsByUserId(user.getId());
+    }
+
+    private boolean isBootstrapAdminEmail(String email) {
+        return properties.admin().configured()
+                && properties.admin().email().equalsIgnoreCase(email);
+    }
+
     private UserAccount requireActiveUser(UUID userId) {
         UserAccount user = userRepository.findById(userId)
                 .orElseThrow(() -> new NoSuchElementException("User not found: " + userId));
@@ -222,6 +241,4 @@ public class UserAccountService {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    private record DevIdentity(UUID id, String email, String displayName, RoleCode role) {
-    }
 }
