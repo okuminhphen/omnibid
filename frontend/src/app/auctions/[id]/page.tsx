@@ -5,9 +5,7 @@ import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { CountdownTimer } from "@/components/CountdownTimer";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -91,7 +89,7 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
     try {
       await placeBid(auction.id, numericAmount);
       amountTouched.current = false;
-      setFeedback({ type: "success", text: "Đặt giá thành công. Kafka audit event đã được phát." });
+      setFeedback({ type: "success", text: "Giá của bạn đã được ghi nhận." });
       await refresh();
     } catch (requestError) {
       setFeedback({
@@ -118,7 +116,7 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
   if (!auction) {
     return (
       <main className="mx-auto max-w-3xl px-5 py-20 text-center">
-        <p className="rounded-3xl border border-rose-200 bg-rose-50 p-8 font-semibold text-rose-700">{error || "Không tìm thấy phiên đấu giá."}</p>
+        <p className="rounded-sm border border-rose-200 bg-rose-50 p-8 font-semibold text-rose-700">{error || "Không tìm thấy phiên đấu giá."}</p>
         <Link href="/" className="mt-6 inline-block font-bold text-orange-600">← Trở về danh sách</Link>
       </main>
     );
@@ -127,109 +125,103 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
   const isActive = auction.status === "ACTIVE" && new Date(auction.endTime).getTime() > Date.now();
 
   return (
-    <main className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-12">
-      <div className="mb-7 flex flex-wrap items-center justify-between gap-3">
-        <Link href="/" className="text-sm font-bold text-slate-500 transition hover:text-orange-600">← Tất cả phiên đấu giá</Link>
-        <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-          <span className="size-2 animate-pulse rounded-full bg-emerald-500" />
-          Live polling 1.5 giây · phiên bản {auction.version}
+    <main className="mx-auto max-w-[1440px] px-5 py-8 sm:px-8 sm:py-12 lg:px-12">
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-3 border-b border-stone-300 pb-5">
+        <Link href="/" className="text-sm text-stone-500 transition hover:text-[#b43a2f]">← Trở lại danh sách</Link>
+        <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+          <span className="size-1.5 rounded-full bg-[#b43a2f]" />
+          Giá đang được cập nhật · #{auction.version}
         </div>
       </div>
 
-      {error && <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">Mất kết nối tạm thời: {error}</div>}
+      {error && <div className="mb-6 border border-amber-300 bg-amber-50 px-5 py-4 text-sm text-amber-900">Mất kết nối tạm thời: {error}</div>}
 
-      <div className="grid gap-8 lg:grid-cols-[1.08fr_0.92fr]">
-        <section className="space-y-7">
-          <div className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-slate-100">
-            <div className="absolute left-5 top-5 z-10 flex gap-2">
-              <Badge className="border-white/70 bg-white/90 text-slate-700">Hàng sưu tầm</Badge>
-              <Badge className="border-orange-200 bg-orange-50/90 text-orange-700">Founder&apos;s Edition</Badge>
-            </div>
+      <div className="grid gap-10 lg:grid-cols-[1.18fr_0.82fr] lg:gap-14">
+        <section>
+          <div className="relative overflow-hidden border border-stone-300 bg-stone-200">
+            <span className="absolute left-4 top-4 z-10 bg-[#fffdf9] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-700">Lô 01 · Phiên giới hạn</span>
             <Image
               src="/keyboard.svg"
               alt="Bàn phím cơ phiên bản giới hạn"
               width={1200}
               height={900}
               priority
-              className="aspect-[4/3] w-full object-cover transition duration-700 hover:scale-[1.02]"
+              className="aspect-[4/3] w-full object-cover"
             />
           </div>
 
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-600">Lot #OMNI-2026-01</p>
-            <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-5xl">{auction.title}</h1>
-            <p className="mt-5 max-w-3xl text-base leading-8 text-slate-600">
+          <div className="border-b border-stone-300 py-8">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#b43a2f]">Thiết kế & công nghệ · OMNI-2026-01</p>
+            <h1 className="display-serif mt-3 text-4xl leading-[1.05] tracking-[-0.035em] text-stone-950 sm:text-6xl">{auction.title}</h1>
+            <p className="mt-6 max-w-3xl text-base leading-8 text-stone-600">
               Bàn phím cơ phiên bản giới hạn với khung nhôm CNC, switch linear được tinh chỉnh thủ công và keycap PBT double-shot. Mỗi sản phẩm có số serial riêng dành cho nhà sưu tầm.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 border-b border-stone-300 sm:grid-cols-4">
             {[
               ["Giá khởi điểm", formatMoney(Number(auction.startingPrice))],
               ["Bước giá", formatMoney(Number(auction.stepPrice))],
               ["Tiền cọc", formatMoney(Number(auction.depositAmount))],
               ["Lượt đặt giá", String(bids.length)]
             ].map(([label, value]) => (
-              <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-xs font-medium text-slate-500">{label}</p>
-                <p className="mt-1 font-black text-slate-950">{value}</p>
+              <div key={label} className="border-r border-t border-stone-300 px-3 py-5 last:border-r-0 sm:first:border-l">
+                <p className="text-[10px] uppercase tracking-[0.12em] text-stone-500">{label}</p>
+                <p className="mt-2 text-sm font-semibold tabular-nums text-stone-950">{value}</p>
               </div>
             ))}
           </div>
         </section>
 
-        <aside className="space-y-6">
-          <Card className="overflow-hidden !border-slate-900 !bg-slate-950 !text-white shadow-2xl">
-            <CardContent className="p-6 sm:p-8">
-              <div className="mb-6 flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Trạng thái phiên</p>
-                  <p className="mt-1 flex items-center gap-2 font-bold text-white">
-                    <span className={`size-2 rounded-full ${isActive ? "animate-pulse bg-emerald-400" : "bg-rose-400"}`} />
-                    {isActive ? "Đang nhận giá" : "Đã đóng"}
-                  </p>
-                </div>
-                <Badge className="!border-white/10 !bg-white/5 !text-slate-300">{auction.status}</Badge>
+        <aside className="space-y-8 lg:sticky lg:top-24 lg:self-start">
+          <section className="border border-stone-400 bg-[#fffdf9] p-6 sm:p-8">
+              <div className="mb-7 flex items-center justify-between border-b border-stone-300 pb-4">
+                <p className="flex items-center gap-2 text-sm font-medium text-stone-800">
+                  <span className={`size-1.5 rounded-full ${isActive ? "bg-[#b43a2f]" : "bg-stone-400"}`} />
+                  {isActive ? "Đang nhận giá" : "Đã đóng"}
+                </p>
+                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-500">{auction.status}</span>
               </div>
 
+              <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-500">Thời gian còn lại</p>
               <CountdownTimer endTime={auction.endTime} />
 
-              <div className="my-7 border-y border-white/10 py-7">
-                <p className="text-sm font-medium text-slate-400">Giá cao nhất hiện tại</p>
-                <p key={pricePulse} className="animate-price-pop mt-2 text-4xl font-black tracking-tight text-white sm:text-5xl">
+              <div className="my-8 border-y border-stone-300 py-7">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-500">Giá cao nhất hiện tại</p>
+                <p key={pricePulse} className="animate-price-pop display-serif mt-2 text-4xl tracking-[-0.03em] text-stone-950 sm:text-5xl">
                   {formatMoney(Number(auction.currentPrice))}
                 </p>
                 {auction.winningUserId && (
-                  <p className="mt-3 text-xs text-slate-500">Dẫn đầu bởi {anonymizeUserId(auction.winningUserId)}</p>
+                  <p className="mt-3 text-xs text-stone-500">Dẫn đầu bởi {anonymizeUserId(auction.winningUserId)}</p>
                 )}
               </div>
 
               <form onSubmit={submitBid} className="space-y-4">
                 {user ? (
-                  <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+                  <div className="flex items-center justify-between border-b border-stone-300 pb-4">
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Đặt giá với</p>
-                      <p className="mt-1 text-sm font-bold text-white">{user.displayName}</p>
+                      <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-stone-500">Đặt giá với</p>
+                      <p className="mt-1 text-sm font-semibold text-stone-950">{user.displayName}</p>
                     </div>
-                    <span className="font-mono text-xs text-slate-500">{anonymizeUserId(user.id)}</span>
+                    <span className="font-mono text-xs text-stone-400">{anonymizeUserId(user.id)}</span>
                   </div>
                 ) : hydrated ? (
-                  <Link href="/login" className="block rounded-xl border border-orange-400/30 bg-orange-400/10 px-4 py-3 text-center text-sm font-bold text-orange-300 hover:bg-orange-400/20">
+                  <Link href="/login" className="block border border-[#b43a2f] px-4 py-3 text-center text-sm font-semibold text-[#b43a2f] hover:bg-red-50">
                     Đăng nhập để đặt giá
                   </Link>
                 ) : (
-                  <div className="h-12 animate-pulse rounded-xl bg-white/5" />
+                  <div className="h-12 animate-pulse bg-stone-200" />
                 )}
                 <div>
                   <div className="mb-2 flex items-center justify-between">
-                    <label htmlFor="amount" className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">Giá của bạn</label>
+                    <label htmlFor="amount" className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-500">Giá của bạn</label>
                     <button
                       type="button"
                       onClick={() => {
                         amountTouched.current = false;
                         setAmount(String(suggestedBid));
                       }}
-                      className="text-xs font-bold text-orange-400 hover:text-orange-300"
+                      className="text-xs font-medium text-[#b43a2f] hover:underline"
                     >
                       Dùng giá gợi ý
                     </button>
@@ -246,60 +238,53 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
                         setAmount(event.target.value);
                       }}
                       disabled={!isActive || submitting}
-                      className="h-14 !border-white/10 !bg-white/5 pr-16 text-xl font-black !text-white focus:!border-orange-400 focus:!ring-orange-500/10"
+                      className="h-14 pr-16 text-xl font-semibold tabular-nums"
                     />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">VND</span>
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-stone-500">VND</span>
                   </div>
-                  <p className="mt-2 text-xs text-slate-500">Tối thiểu {formatMoney(suggestedBid)} · Header idempotency tự động</p>
+                  <p className="mt-2 text-xs text-stone-500">Mức tối thiểu {formatMoney(suggestedBid)}</p>
                 </div>
 
                 <Button disabled={!isActive || submitting || !user} className="h-14 w-full text-base">
                   {submitting ? (
-                    <><span className="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white" /> Đang lấy Redis Lock...</>
+                    <><span className="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white" /> Đang gửi...</>
                   ) : (
-                    <>Bấm đặt giá <span aria-hidden>→</span></>
+                    <>Xác nhận đặt giá <span aria-hidden>→</span></>
                   )}
                 </Button>
 
                 {feedback && (
-                  <p className={`rounded-xl px-4 py-3 text-sm ${feedback.type === "success" ? "bg-emerald-400/10 text-emerald-300" : "bg-rose-400/10 text-rose-300"}`}>
+                  <p className={`border px-4 py-3 text-sm ${feedback.type === "success" ? "border-emerald-300 bg-emerald-50 text-emerald-800" : "border-red-300 bg-red-50 text-red-800"}`}>
                     {feedback.text}
                   </p>
                 )}
               </form>
-            </CardContent>
-          </Card>
+          </section>
 
-          <Card>
-            <CardContent className="p-0">
-              <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+          <section className="border-t border-stone-400">
+              <div className="flex items-center justify-between border-b border-stone-300 py-5">
                 <div>
-                  <h2 className="font-black text-slate-950">Lịch sử đặt giá</h2>
-                  <p className="mt-1 text-xs text-slate-500">Cập nhật tự động qua polling</p>
+                  <h2 className="display-serif text-2xl text-stone-950">Lịch sử đặt giá</h2>
+                  <p className="mt-1 text-xs text-stone-500">Các lượt gần nhất</p>
                 </div>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{bids.length} bid</span>
+                <span className="text-xs font-semibold text-stone-500">{bids.length} lượt</span>
               </div>
               <div className="max-h-80 overflow-y-auto">
                 {bids.length === 0 ? (
-                  <p className="px-6 py-12 text-center text-sm text-slate-500">Chưa có lượt đặt giá. Hãy là người đầu tiên.</p>
+                  <p className="py-12 text-center text-sm text-stone-500">Chưa có lượt đặt giá.</p>
                 ) : bids.map((bid, index) => (
-                  <div key={bid.bidId} className="flex items-center gap-4 border-b border-slate-100 px-6 py-4 last:border-0">
-                    <span className={`grid size-10 shrink-0 place-items-center rounded-full text-xs font-black ${index === 0 ? "bg-orange-100 text-orange-700" : "bg-slate-100 text-slate-600"}`}>
-                      {bid.userId.slice(0, 2).toUpperCase()}
-                    </span>
+                  <div key={bid.bidId} className="grid grid-cols-[1fr_auto] items-center gap-4 border-b border-stone-300 py-4 last:border-0">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-mono text-xs font-bold text-slate-700">{anonymizeUserId(bid.userId)}</p>
-                      <p className="mt-1 text-xs text-slate-400">{new Date(bid.placedAt).toLocaleString("vi-VN")}</p>
+                      <p className="truncate font-mono text-xs font-semibold text-stone-700">{anonymizeUserId(bid.userId)} {index === 0 && <span className="ml-2 text-[9px] uppercase tracking-[0.12em] text-[#b43a2f]">Dẫn đầu</span>}</p>
+                      <p className="mt-1 text-xs text-stone-400">{new Date(bid.placedAt).toLocaleString("vi-VN")}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-black text-slate-950">{formatMoney(Number(bid.amount))}</p>
-                      {index === 0 && <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-orange-600">Cao nhất</p>}
+                      <p className="font-semibold tabular-nums text-stone-950">{formatMoney(Number(bid.amount))}</p>
                     </div>
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
+          </section>
         </aside>
       </div>
     </main>

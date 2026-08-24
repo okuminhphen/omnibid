@@ -4,8 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { GoogleOneTap } from "@/components/GoogleOneTap";
 import { useAuth } from "@/components/AuthProvider";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 
 const DEV_ACCOUNTS = [
   { alias: "customer-a", label: "Customer A", note: "Dùng cửa sổ thường" },
@@ -38,44 +36,54 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="fine-grid min-h-[calc(100vh-4rem)] px-5 py-12 sm:py-20">
-      <Card className="mx-auto max-w-lg overflow-hidden shadow-2xl shadow-slate-200/70">
-        <div className="bg-slate-950 px-7 py-8 text-white sm:px-10">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-400">Secure identity boundary</p>
-          <h1 className="mt-3 text-3xl font-black tracking-tight">Đăng nhập OmniBid</h1>
-          <p className="mt-3 text-sm leading-6 text-slate-400">Access token sống ngắn nằm trong memory; refresh token được bảo vệ trong HttpOnly cookie và xoay vòng sau mỗi lần dùng.</p>
-        </div>
-        <CardContent className="space-y-7 p-7 sm:p-10">
-          <GoogleOneTap onSuccess={finishLogin} />
-
-          <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
-            <span className="h-px flex-1 bg-slate-200" />
-            Local concurrency lab
-            <span className="h-px flex-1 bg-slate-200" />
+    <main className="min-h-[calc(100vh-4.5rem)] border-b border-stone-300">
+      <div className="mx-auto grid max-w-[1200px] lg:grid-cols-2">
+        <section className="flex min-h-[420px] flex-col justify-between border-b border-stone-300 px-5 py-12 sm:px-8 sm:py-16 lg:min-h-[680px] lg:border-b-0 lg:border-r lg:px-12 lg:py-20">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#b43a2f]">Tài khoản người đấu giá</p>
+            <h1 className="display-serif mt-5 max-w-md text-5xl leading-[1.02] tracking-[-0.04em] text-stone-950 sm:text-6xl">Chào mừng bạn trở lại.</h1>
+            <p className="mt-6 max-w-sm text-base leading-7 text-stone-600">Đăng nhập để tham gia đặt giá, quản lý tiền cọc và theo dõi các giao dịch của bạn.</p>
           </div>
+          <p className="mt-12 max-w-sm border-t border-stone-300 pt-5 text-xs leading-6 text-stone-500">Thông tin phiên đăng nhập được bảo vệ và có thể thu hồi bất cứ lúc nào trong trang hồ sơ.</p>
+        </section>
 
-          <div className="space-y-3">
-            {DEV_ACCOUNTS.map((account) => (
-              <Button
-                key={account.alias}
-                variant="outline"
-                disabled={Boolean(submitting)}
-                onClick={() => void login(account.alias)}
-                className="h-auto w-full justify-between px-4 py-3"
-              >
-                <span className="text-left">
-                  <span className="block font-black text-slate-900">{account.label}</span>
-                  <span className="mt-0.5 block text-xs font-medium text-slate-500">{account.note}</span>
-                </span>
-                <span>{submitting === account.alias ? "Đang vào..." : "→"}</span>
-              </Button>
-            ))}
+        <section className="flex items-center px-5 py-12 sm:px-8 lg:px-12">
+          <div className="w-full max-w-md lg:mx-auto">
+            <h2 className="display-serif text-3xl text-stone-950">Đăng nhập</h2>
+            <p className="mt-2 text-sm text-stone-500">Tiếp tục bằng Google hoặc chọn tài khoản thử nghiệm.</p>
+            <div className="mt-8">
+              <GoogleOneTap onSuccess={finishLogin} />
+            </div>
+
+            <div className="my-8 flex items-center gap-4 text-[9px] font-semibold uppercase tracking-[0.16em] text-stone-400">
+              <span className="h-px flex-1 bg-stone-300" />
+              Tài khoản dùng thử
+              <span className="h-px flex-1 bg-stone-300" />
+            </div>
+
+            <div className="border-t border-stone-300">
+              {DEV_ACCOUNTS.map((account) => (
+                <button
+                  key={account.alias}
+                  type="button"
+                  disabled={Boolean(submitting)}
+                  onClick={() => void login(account.alias)}
+                  className="flex w-full items-center justify-between border-b border-stone-300 py-4 text-left transition hover:pl-2 disabled:opacity-50"
+                >
+                  <span>
+                    <span className="block text-sm font-semibold text-stone-900">{account.label}</span>
+                    <span className="mt-1 block text-xs text-stone-500">{account.note}</span>
+                  </span>
+                  <span className="text-stone-500">{submitting === account.alias ? "Đang vào..." : "→"}</span>
+                </button>
+              ))}
+            </div>
+
+            {error && <p className="mt-5 border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>}
+            <p className="mt-6 text-xs leading-5 text-stone-500">Tài khoản dùng thử chỉ hoạt động trong môi trường local.</p>
           </div>
-
-          {error && <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</p>}
-          <p className="text-xs leading-5 text-slate-500">Tài khoản dev chỉ tồn tại ở Spring profile <code>local</code> và không được bật trong production.</p>
-        </CardContent>
-      </Card>
+        </section>
+      </div>
     </main>
   );
 }
