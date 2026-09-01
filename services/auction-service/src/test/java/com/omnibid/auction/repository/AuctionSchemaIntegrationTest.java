@@ -68,28 +68,23 @@ class AuctionSchemaIntegrationTest {
 
     private Auction activeAuction(UUID id) {
         Instant now = Instant.now();
-        Auction auction = new Auction();
-        auction.setId(id);
-        auction.setTitle("Testcontainers Auction");
-        auction.setStartingPrice(new BigDecimal("100.00"));
-        auction.setCurrentPrice(new BigDecimal("100.00"));
-        auction.setStepPrice(new BigDecimal("10.00"));
-        auction.setDepositAmount(new BigDecimal("50.00"));
-        auction.setStatus(AuctionStatus.ACTIVE);
-        auction.setStartTime(now.minus(1, ChronoUnit.HOURS));
-        auction.setEndTime(now.plus(1, ChronoUnit.HOURS));
+        Auction auction = Auction.schedule(
+                id,
+                "Testcontainers Auction",
+                new BigDecimal("100.00"),
+                new BigDecimal("10.00"),
+                new BigDecimal("50.00"),
+                now.minus(1, ChronoUnit.HOURS),
+                now.plus(1, ChronoUnit.HOURS)
+        );
+        auction.activate(now);
         return auction;
     }
 
     private Bid bid(UUID auctionId, String idempotencyKey, BigDecimal amount) {
-        Bid bid = new Bid();
-        bid.setId(UUID.randomUUID());
-        bid.setAuctionId(auctionId);
-        bid.setBidderId(UUID.randomUUID());
-        bid.setAmount(amount);
-        bid.setIdempotencyKey(idempotencyKey);
-        bid.setWalletTransactionId(UUID.randomUUID());
-        bid.setPlacedAt(Instant.now());
-        return bid;
+        return Bid.place(
+                UUID.randomUUID(), auctionId, UUID.randomUUID(), amount,
+                idempotencyKey, UUID.randomUUID(), Instant.now()
+        );
     }
 }

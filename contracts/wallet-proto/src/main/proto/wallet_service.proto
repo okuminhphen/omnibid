@@ -8,6 +8,7 @@ option java_outer_classname = "WalletServiceProto";
 
 service WalletService {
   rpc FreezeDeposit(FreezeDepositRequest) returns (FreezeDepositResponse);
+  rpc ReleaseDeposit(ReleaseDepositRequest) returns (ReleaseDepositResponse);
 }
 
 message FreezeDepositRequest {
@@ -24,4 +25,21 @@ message FreezeDepositResponse {
   string message = 2;
   string transaction_id = 3;
   string error_code = 4;
+  // True only when this call created the freeze. Retries return false so a
+  // caller never compensates a reservation owned by an earlier successful bid.
+  bool newly_created = 5;
+}
+
+message ReleaseDepositRequest {
+  string idempotency_key = 1;
+  string transaction_id = 2;
+  string user_id = 3;
+  string auction_id = 4;
+  string amount = 5;
+}
+
+message ReleaseDepositResponse {
+  bool success = 1;
+  string message = 2;
+  string error_code = 3;
 }

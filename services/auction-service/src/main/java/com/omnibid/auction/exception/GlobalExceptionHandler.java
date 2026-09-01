@@ -17,9 +17,18 @@ public class GlobalExceptionHandler {
         return response(HttpStatus.NOT_FOUND, "NOT_FOUND", exception.getMessage());
     }
 
-    @ExceptionHandler({DomainException.class, IllegalArgumentException.class})
-    ResponseEntity<ApiError> handleDomain(RuntimeException exception) {
-        return response(HttpStatus.UNPROCESSABLE_ENTITY, "BID_REJECTED", exception.getMessage());
+    @ExceptionHandler(DomainException.class)
+    ResponseEntity<ApiError> handleDomain(DomainException exception) {
+        return response(
+                HttpStatus.UNPROCESSABLE_ENTITY,
+                "DOMAIN_RULE_VIOLATION",
+                exception.getMessage()
+        );
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    ResponseEntity<ApiError> handleIllegalArgument(IllegalArgumentException exception) {
+        return response(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", exception.getMessage());
     }
 
     @ExceptionHandler(BidConcurrencyException.class)

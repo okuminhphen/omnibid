@@ -50,7 +50,8 @@ public class RefundConsumer {
                 || command.userId() == null
                 || command.auctionId() == null
                 || command.amount() == null
-                || command.amount().signum() <= 0) {
+                || command.amount().signum() <= 0
+                || !command.hasSupportedSchema()) {
             throw new IllegalArgumentException("Invalid refund command");
         }
     }

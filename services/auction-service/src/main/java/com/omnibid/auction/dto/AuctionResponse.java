@@ -15,12 +15,9 @@ public record AuctionResponse(
         BigDecimal currentPrice,
         BigDecimal stepPrice,
         BigDecimal depositAmount,
-        UUID winningUserId,
+        String leadingBidderAlias,
         Instant startTime,
         Instant endTime,
-        // Backward-compatible aliases used by the existing Next.js UI.
-        UUID highestBidderId,
-        Instant endsAt,
         long version
 ) {
     public static AuctionResponse from(Auction auction) {
@@ -32,10 +29,8 @@ public record AuctionResponse(
                 auction.getCurrentPrice(),
                 auction.getStepPrice(),
                 auction.getDepositAmount(),
-                auction.getWinningUserId(),
+                BidderAlias.from(auction.getId(), auction.getWinningUserId()),
                 auction.getStartTime(),
-                auction.getEndTime(),
-                auction.getWinningUserId(),
                 auction.getEndTime(),
                 auction.getVersion()
         );

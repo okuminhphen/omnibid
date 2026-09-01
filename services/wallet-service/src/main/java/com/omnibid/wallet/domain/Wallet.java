@@ -7,7 +7,6 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -20,7 +19,6 @@ import java.util.UUID;
         @jakarta.persistence.UniqueConstraint(name = "uk_wallet_user_id", columnNames = "user_id")
 })
 @Getter
-@Setter
 @NoArgsConstructor
 public class Wallet {
 
@@ -47,6 +45,21 @@ public class Wallet {
 
     @Version
     private long version;
+
+    public static Wallet open(UUID id, UUID userId, BigDecimal openingBalance) {
+        if (id == null || userId == null) {
+            throw new IllegalArgumentException("Wallet id and userId are required");
+        }
+        if (openingBalance == null || openingBalance.signum() < 0) {
+            throw new IllegalArgumentException("Opening balance must not be negative");
+        }
+        Wallet wallet = new Wallet();
+        wallet.id = id;
+        wallet.userId = userId;
+        wallet.balance = openingBalance;
+        wallet.frozenBalance = BigDecimal.ZERO.setScale(openingBalance.scale());
+        return wallet;
+    }
 
     public BigDecimal getAvailableBalance() {
         return balance.subtract(frozenBalance);

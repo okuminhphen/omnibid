@@ -51,11 +51,9 @@ class WalletSchemaIntegrationTest {
 
     @Test
     void flywaySchemaEnforcesWalletAndTransactionIdempotency() {
-        Wallet wallet = new Wallet();
-        wallet.setId(UUID.randomUUID());
-        wallet.setUserId(UUID.randomUUID());
-        wallet.setBalance(new BigDecimal("1000.00"));
-        wallet.setFrozenBalance(BigDecimal.ZERO.setScale(2));
+        Wallet wallet = Wallet.open(
+                UUID.randomUUID(), UUID.randomUUID(), new BigDecimal("1000.00")
+        );
         walletRepository.saveAndFlush(wallet);
 
         String idempotencyKey = UUID.randomUUID().toString();
@@ -68,13 +66,9 @@ class WalletSchemaIntegrationTest {
     }
 
     private WalletTransaction transaction(UUID walletId, String idempotencyKey) {
-        WalletTransaction transaction = new WalletTransaction();
-        transaction.setId(UUID.randomUUID());
-        transaction.setWalletId(walletId);
-        transaction.setAmount(new BigDecimal("100.00"));
-        transaction.setType(WalletTransactionType.TOP_UP);
-        transaction.setStatus(WalletTransactionStatus.SUCCESS);
-        transaction.setIdempotencyKey(idempotencyKey);
-        return transaction;
+        return WalletTransaction.succeeded(
+                UUID.randomUUID(), walletId, null, new BigDecimal("100.00"),
+                WalletTransactionType.TOP_UP, idempotencyKey
+        );
     }
 }

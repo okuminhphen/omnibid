@@ -21,8 +21,9 @@ class AuctionEndSchedulerTest {
     void delegatesExpiredActiveAuctionToLockedEndWorkflow() {
         AuctionRepository repository = mock(AuctionRepository.class);
         AuctionService service = mock(AuctionService.class);
-        Auction auction = new Auction();
-        auction.setId(UUID.randomUUID());
+        Auction auction = mock(Auction.class);
+        UUID auctionId = UUID.randomUUID();
+        when(auction.getId()).thenReturn(auctionId);
         when(repository.findTop100ByStatusAndEndTimeLessThanEqualOrderByEndTimeAsc(
                 eq(AuctionStatus.ACTIVE),
                 any(Instant.class)
@@ -30,6 +31,6 @@ class AuctionEndSchedulerTest {
 
         new AuctionEndScheduler(repository, service).endExpiredAuctions();
 
-        verify(service).endAuction(auction.getId());
+        verify(service).endAuction(auctionId);
     }
 }

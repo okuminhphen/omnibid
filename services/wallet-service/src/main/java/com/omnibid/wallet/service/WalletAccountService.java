@@ -53,13 +53,10 @@ public class WalletAccountService {
 
         wallet.credit(amount);
 
-        WalletTransaction transaction = new WalletTransaction();
-        transaction.setId(UUID.randomUUID());
-        transaction.setWalletId(wallet.getId());
-        transaction.setAmount(amount);
-        transaction.setType(WalletTransactionType.TOP_UP);
-        transaction.setStatus(WalletTransactionStatus.SUCCESS);
-        transaction.setIdempotencyKey(idempotencyKey);
+        WalletTransaction transaction = WalletTransaction.succeeded(
+                UUID.randomUUID(), wallet.getId(), null, amount,
+                WalletTransactionType.TOP_UP, idempotencyKey
+        );
         transactionRepository.save(transaction);
         return wallet;
     }
@@ -86,13 +83,10 @@ public class WalletAccountService {
         }
 
         wallet.debitAvailable(amount);
-        WalletTransaction transaction = new WalletTransaction();
-        transaction.setId(UUID.randomUUID());
-        transaction.setWalletId(wallet.getId());
-        transaction.setAmount(amount);
-        transaction.setType(WalletTransactionType.WITHDRAW);
-        transaction.setStatus(WalletTransactionStatus.SUCCESS);
-        transaction.setIdempotencyKey(idempotencyKey);
+        WalletTransaction transaction = WalletTransaction.succeeded(
+                UUID.randomUUID(), wallet.getId(), null, amount,
+                WalletTransactionType.WITHDRAW, idempotencyKey
+        );
         transactionRepository.save(transaction);
         return wallet;
     }
@@ -110,11 +104,7 @@ public class WalletAccountService {
         if (existing != null) {
             return existing;
         }
-        Wallet wallet = new Wallet();
-        wallet.setId(userId);
-        wallet.setUserId(userId);
-        wallet.setBalance(BigDecimal.ZERO.setScale(2));
-        wallet.setFrozenBalance(BigDecimal.ZERO.setScale(2));
+        Wallet wallet = Wallet.open(userId, userId, BigDecimal.ZERO.setScale(2));
         return walletRepository.save(wallet);
     }
 
@@ -136,7 +126,7 @@ public class WalletAccountService {
         WalletTransaction duplicate = transactionRepository.findByIdempotencyKey(idempotencyKey).orElse(null);
         if (duplicate != null) {
             verifySameFreezeRequest(duplicate, wallet.getId(), auctionId, amount);
-            return FreezeResult.success(duplicate.getId());
+            return FreezeResult.success(duplicate.getId(), false);
         }
 
         // A user deposits only once per auction, even if a later bid carries a new key.
@@ -155,7 +145,7 @@ public class WalletAccountService {
                         "A different deposit amount was already frozen for this auction"
                 );
             }
-            return FreezeResult.success(latestAuctionTransaction.getId());
+            return FreezeResult.success(latestAuctionTransaction.getId(), false);
         }
 
         if (!wallet.hasEnoughAvailableBalance(amount)) {
@@ -164,17 +154,13 @@ public class WalletAccountService {
 
         wallet.freeze(amount);
 
-        WalletTransaction transaction = new WalletTransaction();
-        transaction.setId(UUID.randomUUID());
-        transaction.setWalletId(wallet.getId());
-        transaction.setAuctionId(auctionId);
-        transaction.setAmount(amount);
-        transaction.setType(WalletTransactionType.FREEZE);
-        transaction.setStatus(WalletTransactionStatus.SUCCESS);
-        transaction.setIdempotencyKey(idempotencyKey);
+        WalletTransaction transaction = WalletTransaction.succeeded(
+                UUID.randomUUID(), wallet.getId(), auctionId, amount,
+                WalletTransactionType.FREEZE, idempotencyKey
+        );
         transactionRepository.save(transaction);
 
-        return FreezeResult.success(transaction.getId());
+        return FreezeResult.success(transaction.getId(), true);
     }
 
     private void verifySameFreezeRequest(

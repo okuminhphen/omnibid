@@ -2,11 +2,13 @@ package com.omnibid.auction.controller;
 
 import com.omnibid.auction.dto.AuctionResponse;
 import com.omnibid.auction.dto.BidResponse;
+import com.omnibid.auction.dto.BidHistoryResponse;
 import com.omnibid.auction.dto.EndAuctionResponse;
+import com.omnibid.auction.dto.CreateAuctionRequest;
 import com.omnibid.auction.dto.PlaceBidRequest;
-import com.omnibid.auction.repository.AuctionRepository;
-import com.omnibid.auction.repository.BidRepository;
+import com.omnibid.auction.service.AuctionQueryService;
 import com.omnibid.auction.service.AuctionService;
+import com.omnibid.auction.service.AuctionLifecycleUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -22,7 +24,6 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @RestController
@@ -30,50 +31,49 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AuctionController {
 
-    private final AuctionRepository auctionRepository;
-    private final BidRepository bidRepository;
+    private final AuctionQueryService queryService;
     private final AuctionService auctionService;
+    private final AuctionLifecycleUseCase lifecycleUseCase;
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public AuctionResponse create(@Valid @RequestBody CreateAuctionRequest request) {
+        return lifecycleUseCase.create(request);
+    }
+
+    @PostMapping("/{auctionId}/activate")
+    public AuctionResponse activate(@PathVariable UUID auctionId) {
+        return lifecycleUseCase.activate(auctionId);
+    }
 
     @GetMapping
     public List<AuctionResponse> list() {
-        return auctionRepository.findAllByOrderByEndTimeAsc().stream()
-                .map(AuctionResponse::from)
-                .toList();
+        return queryService.list();
     }
 
     @GetMapping("/{auctionId}")
     public AuctionResponse get(@PathVariable UUID auctionId) {
-        return auctionRepository.findById(auctionId)
-                .map(AuctionResponse::from)
-                .orElseThrow(() -> new NoSuchElementException("Auction not found: " + auctionId));
+        return queryService.get(auctionId);
     }
 
     @GetMapping("/{auctionId}/bids")
-    public List<BidResponse> bidHistory(@PathVariable UUID auctionId) {
-        if (!auctionRepository.existsById(auctionId)) {
-            throw new NoSuchElementException("Auction not found: " + auctionId);
-        }
-        return bidRepository.findAllByAuctionIdOrderByPlacedAtDesc(auctionId).stream()
-                .map(BidResponse::from)
-                .toList();
+    public List<BidHistoryResponse> bidHistory(@PathVariable UUID auctionId) {
+        return queryService.bidHistory(auctionId);
     }
 
     @PostMapping({"/{auctionId}/bid", "/{auctionId}/bids"})
     @ResponseStatus(HttpStatus.CREATED)
     public BidResponse placeBid(
             @PathVariable UUID auctionId,
-            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
+            @RequestHeader("X-Idempotency-Key") String idempotencyKey,
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody PlaceBidRequest request
     ) {
-        String effectiveIdempotencyKey = idempotencyKey == null || idempotencyKey.isBlank()
-                ? UUID.randomUUID().toString()
-                : idempotencyKey.trim();
         return auctionService.placeBid(
                 auctionId,
                 UUID.fromString(jwt.getSubject()),
                 request.bidAmount(),
-                effectiveIdempotencyKey
+                idempotencyKey.trim()
         );
     }
 

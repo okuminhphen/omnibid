@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.UUID;
 
 public interface AuctionRepository extends JpaRepository<Auction, UUID> {
-    List<Auction> findAllByOrderByEndTimeAsc();
+    List<Auction> findTop100ByOrderByEndTimeAsc();
 
     List<Auction> findTop100ByStatusAndEndTimeLessThanEqualOrderByEndTimeAsc(
             AuctionStatus status,
