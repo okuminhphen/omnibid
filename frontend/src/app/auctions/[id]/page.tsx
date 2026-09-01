@@ -191,8 +191,8 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
                 <p key={pricePulse} className="animate-price-pop display-serif mt-2 text-4xl tracking-[-0.03em] text-stone-950 sm:text-5xl">
                   {formatMoney(Number(auction.currentPrice))}
                 </p>
-                {auction.winningUserId && (
-                  <p className="mt-3 text-xs text-stone-500">Dẫn đầu bởi {anonymizeUserId(auction.winningUserId)}</p>
+                {auction.leadingBidderAlias && (
+                  <p className="mt-3 text-xs text-stone-500">Dẫn đầu bởi {auction.leadingBidderAlias}</p>
                 )}
               </div>
 
@@ -275,7 +275,7 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
                 ) : bids.map((bid, index) => (
                   <div key={bid.bidId} className="grid grid-cols-[1fr_auto] items-center gap-4 border-b border-stone-300 py-4 last:border-0">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-mono text-xs font-semibold text-stone-700">{anonymizeUserId(bid.userId)} {index === 0 && <span className="ml-2 text-[9px] uppercase tracking-[0.12em] text-[#b43a2f]">Dẫn đầu</span>}</p>
+                      <p className="truncate font-mono text-xs font-semibold text-stone-700">{bid.bidderAlias} {index === 0 && <span className="ml-2 text-[9px] uppercase tracking-[0.12em] text-[#b43a2f]">Dẫn đầu</span>}</p>
                       <p className="mt-1 text-xs text-stone-400">{new Date(bid.placedAt).toLocaleString("vi-VN")}</p>
                     </div>
                     <div className="text-right">
