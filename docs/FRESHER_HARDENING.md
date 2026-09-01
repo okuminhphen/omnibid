@@ -51,13 +51,13 @@ Refund outbox ID được tạo xác định từ wallet transaction ID. Gọi e
 
 ## 5. Integration và concurrency tests
 
-Full backend hiện có **30 tests**:
+Full backend hiện có **39 tests**:
 
 | Module | Tests | Nội dung nổi bật |
 | --- | ---: | --- |
 | Identity | 12 | refresh rotation, reuse detection, token hashing, origin filter, cookie policy, admin bootstrap/claim, PostgreSQL schema |
-| Auction | 10 | controller, outbox success/failure, scheduler, bid core, PostgreSQL schema, Redis contention |
-| Wallet | 7 | balance invariant, account commands, refund idempotency, PostgreSQL schema |
+| Auction | 18 | use cases, domain invariant, privacy projection, lock adapter, compensation, outbox, scheduler, PostgreSQL schema, Redis contention |
+| Wallet | 8 | balance invariant, account commands, new/replayed reservation, refund idempotency, PostgreSQL schema |
 | Audit | 1 | idempotent Mongo document identity |
 
 Testcontainers tạo PostgreSQL 16 và Redis 7.4 thật. Redis test cho 20 thread bắt đầu đồng thời và chứng minh `maxConcurrent == 1` trong critical section.
@@ -73,7 +73,7 @@ Testcontainers tạo PostgreSQL 16 và Redis 7.4 thật. Redis test cho 20 threa
 | Bid request chạy lâu hơn 5 giây | Watchdog gia hạn distributed lock |
 | Scheduler và admin cùng end auction | Cùng Redis lock; refund command ID xác định và durable dedupe |
 | Redis mất idempotency refund key | PostgreSQL unique transaction vẫn là safety net bền vững |
-| Wallet freeze thành công nhưng auction DB rollback | **Chưa giải quyết hoàn chỉnh**; cần compensation/reconciliation saga |
+| Wallet freeze mới thành công nhưng auction DB rollback | `ReleaseDeposit` compensation dùng original transaction ID; crash trước compensation vẫn cần reconciliation |
 
 ## Lệnh kiểm chứng
 
@@ -91,7 +91,7 @@ npm run build
 Kết quả đã xác minh trong đợt hardening này:
 
 - Maven reactor: 6/6 project thành công.
-- Backend: 26/26 test pass, 0 failure/error/skipped.
+- Backend trong lần refactor 31/08: 35 non-container tests pass; 4 Testcontainers tests cần Docker Desktop hoặc GitHub Actions.
 - Frontend typecheck: pass.
 - Next.js production build: pass, 6 routes.
 - Docker infrastructure: 6/6 container healthy.
@@ -112,7 +112,7 @@ Kết quả đã xác minh trong đợt hardening này:
 1. Product/catalog + admin CRUD + S3 presigned upload vì đây là khoảng trống nghiệp vụ dễ nhìn thấy nhất.
 2. k6/Gatling load test kèm báo cáo throughput, p95/p99, lock timeout và success rate.
 3. OpenTelemetry + Prometheus/Grafana cho HTTP/gRPC latency, error rate và outbox backlog.
-4. Saga compensation/reconciliation cho failure window giữa wallet freeze và auction commit.
+4. Durable saga state + reconciliation để bổ sung cho compensating RPC khi process crash/network partition.
 5. SSE/WebSocket để thay polling 1,5 giây khi cần real-time fan-out thật.
 6. Double-entry ledger và winner settlement sau khi có seller ownership model.
 

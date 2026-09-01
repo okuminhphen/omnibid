@@ -24,7 +24,7 @@ Chỉ dùng số liệu đã được repository/CI kiểm chứng. Không tự 
 
 1. Vì sao Redis lock không phải correctness guard duy nhất và vẫn cần `@Version`, database transaction, row lock, unique constraint.
 2. Vì sao outbox là at-least-once và consumer vẫn phải idempotent.
-3. Failure window còn lại giữa wallet freeze gRPC và auction commit; hướng giải quyết bằng compensation/reconciliation saga.
+3. Compensating `ReleaseDeposit` xử lý rollback thông thường sau freeze; failure window do process crash còn lại cần durable saga/reconciliation.
 4. Lý do Kafka dùng cho event stream/audit còn RabbitMQ dùng cho command/retry/DLQ.
 5. Trade-off của polling UI, scheduled outbox polling và kế hoạch SSE/CDC khi scale.
 6. Vì sao không thêm Elasticsearch khi chưa có catalog search use case và đo lường cần thiết.

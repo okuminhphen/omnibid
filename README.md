@@ -22,6 +22,7 @@ Tài liệu chi tiết:
 
 - [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md): phân tích hệ thống, luồng dữ liệu và giới hạn hiện tại.
 - [PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md): cây thư mục, module ownership và điểm bắt đầu khi đọc code.
+- [ARCHITECTURE_AND_CODE_QUALITY.md](docs/ARCHITECTURE_AND_CODE_QUALITY.md): use-case/ports-adapters, SOLID rules, domain invariant và failure semantics.
 - [DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md): ERD, bảng, index và invariant của từng database.
 - [PHASE_4_IDENTITY_AND_MARKETPLACE_DESIGN.md](docs/PHASE_4_IDENTITY_AND_MARKETPLACE_DESIGN.md): thiết kế schema user/session, RBAC, Google One Tap và roadmap marketplace.
 - [REPOSITORY_AUDIT.md](docs/REPOSITORY_AUDIT.md): kết quả build/test/security hygiene, các sạn đã sửa và giới hạn production còn lại.
@@ -57,7 +58,7 @@ flowchart LR
     Auction -->|"RLock lock:auction:{id}"| Redis
     Auction --> ADB
     ADB --> Outbox
-    Auction -->|"FreezeDeposit gRPC"| Wallet
+    Auction -->|"FreezeDeposit / compensating ReleaseDeposit gRPC"| Wallet
     Wallet --> WDB
     Kafka -->|"provision wallet"| Wallet
     Outbox -->|"BidPlacedEvent"| Kafka
@@ -109,6 +110,10 @@ sequenceDiagram
     W->>DB: SELECT wallet FOR UPDATE + unique transaction
     A->>DB: update auction + insert bid
     A->>O: insert BidPlacedEvent (same DB transaction)
+    alt auction transaction rollback after a newly-created freeze
+      A->>W: ReleaseDeposit(original transactionId)
+      W->>DB: idempotent compensating REFUND
+    end
     A->>R: unlock only when owned by current thread
     A-->>UI: BidResponse
     O->>K: publish and wait for broker ack
@@ -122,9 +127,13 @@ sequenceDiagram
 - Access token RS256 sống ngắn; refresh token opaque trong HttpOnly cookie, chỉ lưu hash và rotate sau mỗi lần dùng.
 - Phát hiện reuse refresh token và revoke toàn bộ token family.
 - RBAC `CUSTOMER`/`ADMIN`; auction và wallet không nhận `userId` từ request body của customer.
+- Admin có API tạo auction `PENDING`, kích hoạt và kết thúc phiên; dữ liệu auction/wallet giả không được tự seed khi service khởi động.
 - Quản lý hồ sơ và thu hồi từng/all login session.
 - Ví cá nhân: nạp/rút tiền demo, available/frozen balance và lịch sử giao dịch idempotent.
 - Đặt giá qua Redis distributed lock, freeze deposit qua gRPC và optimistic lock dự phòng.
+- Auction application layer tách query/use case khỏi controller; gRPC, Redis cache và Redisson lock nằm sau outbound ports/adapters.
+- Domain `Auction`, `Bid`, `Wallet`, `WalletTransaction` dùng factory/behavior thay vì public setter để giữ invariant.
+- Nếu một freeze vừa được tạo nhưng auction transaction rollback, `ReleaseDeposit` chạy như compensating action và vẫn idempotent ở wallet ledger.
 - Redisson watchdog tự gia hạn lock để critical section không mất lock khi gRPC/DB chậm hơn lease cố định.
 - Auction transactional outbox gắn bid/refund với DB transaction; publisher chỉ đánh dấu hoàn tất sau broker acknowledgement.
 - Scheduler tự tìm tối đa 100 phiên `ACTIVE` hết hạn mỗi lượt và chốt qua cùng distributed lock với API thủ công.
@@ -133,7 +142,7 @@ sequenceDiagram
 - Bốn backend service có multi-stage Docker build, non-root/read-only runtime, health-gated startup và Caddy HTTPS profile tùy chọn.
 - UI polling gần real-time; có thể mở cửa sổ thường + ẩn danh để đấu giá bằng hai user khác nhau.
 
-Admin hiện có authority riêng và quyền kết thúc phiên. CRUD catalog/product và màn hình quản trị đầy đủ là milestone tiếp theo trong tài liệu Phase 4, không được mô tả nhầm là đã hoàn tất.
+Admin hiện có authority riêng cho create/activate/end auction. Product/catalog, media và màn hình quản trị đầy đủ vẫn là milestone tiếp theo, không được mô tả nhầm là đã hoàn tất.
 
 ## Tech stack
 
@@ -294,6 +303,8 @@ NEXT_PUBLIC_IDENTITY_API_URL=http://localhost:8083
 
 Mở `http://localhost:3000`.
 
+Repository không seed auction hay wallet giả. Customer thật nhận ví rỗng từ event `UserRegistered`; admin tạo auction qua API `POST /api/v1/auctions` rồi kích hoạt bằng `POST /api/v1/auctions/{id}/activate`.
+
 Production frontend không dùng Dockerfile. Import monorepo vào Vercel, đặt Root Directory là `frontend` và cấu hình ba biến `NEXT_PUBLIC_*`; xem [Deployment Guide](docs/DEPLOYMENT.md).
 
 ## Google One Tap, đăng ký customer và bootstrap admin
@@ -342,6 +353,8 @@ DELETE /api/v1/me/sessions/{sessionId}
 GET    /api/v1/auctions
 GET    /api/v1/auctions/{auctionId}
 GET    /api/v1/auctions/{auctionId}/bids
+POST   /api/v1/auctions                            # ADMIN only, creates PENDING
+POST   /api/v1/auctions/{auctionId}/activate       # ADMIN only
 POST   /api/v1/auctions/{auctionId}/bid        # CUSTOMER or ADMIN
 POST   /api/v1/auctions/{auctionId}/end        # ADMIN only
 
@@ -364,22 +377,24 @@ POST   /api/v1/me/wallet/withdrawals
 9. JWT access token không tạo một entry RAM cho mỗi user tại resource service; session bền vững nằm ở PostgreSQL.
 10. Bid/refund outbox row được commit cùng aggregate; broker outage để lại event pending và scheduled publisher retry theo semantics at-least-once.
 11. Flyway là nguồn sự thật của schema; Hibernate chỉ validate mapping khi service khởi động.
+12. Public bid history chỉ trả alias ổn định theo auction; không trả raw user UUID hoặc wallet transaction ID.
+13. Compensation chỉ release deposit khi chính gRPC call hiện tại báo `newly_created=true`, tránh hoàn nhầm reservation của bid trước.
 
 ## Giới hạn và roadmap production
 
-- Freeze wallet trước auction commit cần saga/compensation và reconciliation job.
+- Rollback thông thường sau freeze đã có gRPC compensation; process crash/network partition đúng failure window vẫn cần durable saga state và reconciliation job.
 - Ví hiện là balance + immutable transaction history, chưa phải double-entry ledger hoàn chỉnh.
 - RSA signing key được sinh khi identity-service khởi động trong local; production phải dùng PEM/KMS/Vault và key rotation.
 - Chưa có API Gateway, TLS/mTLS, rate limiting, OpenTelemetry, Prometheus/Grafana và centralized logs.
 - UI dùng polling 1.5 giây; milestone tiếp theo là SSE/WebSocket fan-out.
-- Product/catalog, ảnh S3, quản trị auction lifecycle và lịch sử thắng/thua đầy đủ nằm trong Phase 4 tiếp theo.
+- Product/catalog, ảnh S3, admin UI và lịch sử thắng/thua đầy đủ nằm trong Phase 4 tiếp theo.
 - Outbox hiện dùng scheduled polling; quy mô lớn hơn nên cân nhắc Debezium/CDC, retry backoff, metrics và poison-event quarantine.
 - Docker Compose hiện là single-host deployment; database/broker chưa high availability và Identity signing key chưa được persist qua KMS/Vault.
 
 ## Kiểm chứng hiện tại
 
 - Maven reactor: wallet proto + identity + auction + wallet + audit.
-- Backend có **30 tests**: identity 12, auction 10, wallet 7, audit 1. Bộ này gồm Testcontainers PostgreSQL schema/idempotency tests, kiểm tra cấu hình cookie bảo mật, bootstrap admin và Redis contention test 20 luồng.
+- Backend hiện có **39 tests**: 35 test không cần Docker đã pass trong lần refactor này; 4 Testcontainers test kiểm tra PostgreSQL schemas và Redis contention sẽ chạy trong GitHub Actions hoặc khi Docker Desktop được bật.
 - Frontend có `npm run typecheck` và production `npm run build`.
 
 ## GitHub

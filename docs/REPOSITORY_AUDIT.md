@@ -18,7 +18,7 @@ Badge CI trên README chỉ chuyển sang trạng thái thực sau khi nhánh `d
 | --- | --- | --- |
 | Backend toolchain | JDK 21.0.1, Maven 3.9.12 | Pass |
 | Backend reactor | `mvn --batch-mode --no-transfer-progress clean verify` | Pass, 6/6 reactor projects |
-| Backend tests | Identity 8, Auction 10, Wallet 7, Audit 1 | Pass, **26/26**, 0 failure/error/skipped |
+| Backend tests | Suite hiện tại: Identity 12, Auction 18, Wallet 8, Audit 1 | 35 non-container tests pass; 4 Testcontainers tests chạy khi Docker/CI bật |
 | PostgreSQL integration | Auction/wallet Flyway migrations và unique idempotency constraints trên PostgreSQL 16 Testcontainers | Pass |
 | Redis concurrency | 20 contenders dùng Redisson lock trên Redis 7.4 Testcontainers | Pass, max critical-section concurrency = 1 |
 | Frontend toolchain | Node.js 20.20.2 | Pass |
@@ -84,8 +84,8 @@ Next.js 16 tự tái tạo `next-env.d.ts` với đường dẫn khác nhau gi�
 2. Chưa có automated load test để chứng minh throughput, lock contention, p95/p99 latency và behavior khi Redis failover.
 3. Transactional outbox đã áp dụng cho identity và auction; publisher vẫn là scheduled polling và chưa có exponential backoff, poison-event quarantine hay CDC.
 4. Redis idempotency là lớp chống duplicate nhanh nhưng chưa thay thế unique constraint/transaction ledger bền vững cho mọi financial command.
-5. FreezeDeposit gRPC thành công trước khi auction transaction commit vẫn cần compensation/reconciliation nếu DB commit thất bại.
-6. Admin đã có role boundary và quyền kết thúc auction, nhưng product/catalog CRUD, moderation, media upload và admin dashboard đầy đủ vẫn là roadmap.
+5. Rollback thông thường sau một freeze mới đã gọi idempotent `ReleaseDeposit`; crash/network partition trước compensation vẫn cần durable saga state và reconciliation.
+6. Admin đã có role boundary và API create/activate/end auction, nhưng product/catalog CRUD, moderation, media upload và admin dashboard đầy đủ vẫn là roadmap.
 7. Google One Tap cần một Google Web Client ID thực và HTTPS origin khi deploy; project không cung cấp dev-login backdoor ở bất kỳ profile nào.
 8. Chưa có Kubernetes manifests, secret manager, TLS/mTLS, OpenTelemetry collector, metrics/alerts, SLO, backup/restore drill hoặc disaster-recovery runbook.
 9. Ví chỉ mô phỏng internal credits, không kết nối ngân hàng, payment gateway, KYC/AML hoặc sổ cái kế toán kép.

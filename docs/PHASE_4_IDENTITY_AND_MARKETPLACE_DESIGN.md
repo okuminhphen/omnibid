@@ -886,7 +886,7 @@ Frontend không render admin navigation chỉ dựa trên local state; backend v
 
 1. Tạo Maven module `services/identity-service` và database `identity_db`.
 2. Thêm Flyway migration cho identity schema và role seed.
-3. Bọc `DemoDataConfig` hiện tại bằng profile `local`.
+3. Đã loại bỏ `DemoDataConfig`; account/wallet/auction chỉ được tạo qua lifecycle thật hoặc test fixture.
 4. Khi user đăng ký, publish `UserRegisteredEvent`; wallet-service tạo wallet.
 5. Thêm Spring Security Resource Server vào auction/wallet service.
 6. Đổi `PlaceBidRequest(userId, bidAmount)` thành `PlaceBidRequest(bidAmount)`.

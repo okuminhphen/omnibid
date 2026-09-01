@@ -37,7 +37,8 @@ src/main/java/com/omnibid/<service>/
 ├── dto/             # request/response contract
 ├── repository/      # persistence port
 ├── security/        # JWT/origin/authorization concern
-├── service/         # application use case
+├── service/         # application use case + outbound port contracts
+├── infrastructure/  # adapters cho Redisson, Redis cache và external systems
 └── messaging/       # Kafka/RabbitMQ producer hoặc consumer
 
 src/main/resources/
@@ -73,8 +74,11 @@ Không có password mặc định và không có endpoint đăng nhập mock.
 ## Điểm bắt đầu khi đọc code
 
 - Authentication: `identity/controller/AuthController.java` → `UserAccountService.java` → `AuthSessionService.java`.
-- Bid: `auction/controller/AuctionController.java` → `AuctionServiceImpl.java`.
-- Freeze deposit: `auction/client/WalletClient.java` → wallet gRPC implementation.
+- Command bid: `AuctionController` → thin `AuctionServiceImpl` facade → `PlaceBidUseCase`.
+- Query: `AuctionController` → `AuctionQueryService`; controller không truy cập repository trực tiếp.
+- Outbound ports: `AuctionLockExecutor`, `AuctionPriceCache`, `WalletDepositPort`.
+- Adapters: `RedissonAuctionLockExecutor`, `RedisAuctionPriceCache`, `grpc/WalletClient`.
+- Freeze/compensation: `WalletClient` → wallet gRPC `FreezeDeposit` / `ReleaseDeposit`.
 - Async audit/refund: auction outbox publisher → Kafka/RabbitMQ consumers.
 - Frontend auth: `frontend/src/components/AuthProvider.tsx` và `frontend/src/services/authSession.ts`.
 - Profile UI: `frontend/src/app/profile/page.tsx`.

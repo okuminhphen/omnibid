@@ -1,6 +1,6 @@
 # OmniBid — Architectural Review
 
-> Cập nhật ngày 20/08/2026 sau đợt hardening Flyway, transactional outbox, automatic auction ending và Testcontainers. Lệnh chạy chi tiết nằm trong [README.md](README.md); schema/roadmap mở rộng nằm trong [Phase 4 Design](docs/PHASE_4_IDENTITY_AND_MARKETPLACE_DESIGN.md).
+> Cập nhật ngày 31/08/2026 sau đợt refactor use-case/ports-adapters, domain invariants, privacy-safe API và gRPC deposit compensation. Lệnh chạy chi tiết nằm trong [README.md](README.md); schema/roadmap mở rộng nằm trong [Phase 4 Design](docs/PHASE_4_IDENTITY_AND_MARKETPLACE_DESIGN.md).
 
 ## 1. Project giải quyết bài toán gì?
 
@@ -19,7 +19,7 @@ Các chủ đề nổi bật để trình bày trong CV:
 - Authentication bằng Google OIDC, JWT RS256, rotating refresh session và RBAC.
 - Polyglot persistence với PostgreSQL, MongoDB và Redis.
 
-Frontend polling mỗi 1,5 giây nên tên gọi chính xác hiện tại là near real-time. SSE/WebSocket là milestone tiếp theo.
+Frontend polling mỗi 1,5 giây nên tên gọi chính xác hiện tại là near real-time. Public projection dùng alias băm ổn định theo auction và không lộ raw bidder UUID/wallet transaction ID. SSE/WebSocket là milestone tiếp theo.
 
 Deployment hiện tách frontend Next.js trên Vercel khỏi backend single-host Docker Compose. Bốn Java service dùng multi-stage/non-root image; Caddy edge profile cung cấp HTTPS cho ba public API subdomain, còn database/broker chỉ bind localhost.
 
@@ -102,12 +102,13 @@ Thứ tự xử lý:
 3. Kiểm tra idempotency key bền vững ở bảng bid.
 4. `tryLock(lock:auction:{id}, wait=3s)`; Redisson watchdog gia hạn lease trong lúc current thread giữ lock.
 5. Sau khi giữ lock, đọc lại auction và validate `ACTIVE`, thời gian, `currentPrice + stepPrice`.
-6. Gọi gRPC `FreezeDeposit` với deadline và operation key ổn định.
+6. `PlaceBidUseCase` gọi outbound `WalletDepositPort`; adapter gRPC thực hiện `FreezeDeposit` với deadline và operation key ổn định.
 7. Wallet lock row, kiểm tra available balance, tăng frozen balance và ghi unique transaction.
 8. Auction cập nhật current price/winner, insert bid và outbox row trong cùng PostgreSQL transaction.
 9. Sau commit, cập nhật Redis price cache theo best-effort; cache lỗi không đảo ngược bid đã commit.
 10. Scheduled outbox publisher chờ Kafka acknowledgement rồi mới đánh dấu event published; Audit consumer dùng `bidId` làm Mongo `_id`.
-11. `finally` chỉ unlock khi current thread còn sở hữu lock.
+11. Nếu freeze mới được tạo nhưng transaction auction rollback, use case gọi `ReleaseDeposit` với original transaction ID; wallet ghi `REFUND` idempotently.
+12. `RedissonAuctionLockExecutor` chỉ unlock khi current thread còn sở hữu lock.
 
 Redis lock giảm contention và serialize toàn cluster; watchdog tránh lock hết lease giữa critical section. Optimistic version, unique idempotency key và database transaction vẫn là correctness guard nếu một writer bỏ qua Redis hoặc request được retry.
 
@@ -202,7 +203,7 @@ bid_logs (compound index auctionId ASC, timestamp DESC)
 | Kiểm tra | Kết quả |
 |---|---|
 | Maven reactor | 6/6 module `verify` thành công bằng JDK 21 |
-| Backend tests | 30 pass: identity 12, auction 10, wallet 7, audit 1 |
+| Backend tests | Suite 39 tests: 35 unit tests pass trong refactor hiện tại; 4 Testcontainers tests chờ Docker/CI |
 | Testcontainers | PostgreSQL 16 auction/wallet migrations + Redis 7.4 contention 20 luồng |
 | Identity security tests | hash-only refresh, rotation, reuse revokes family |
 | Frontend typecheck | Pass |
@@ -225,7 +226,7 @@ bid_logs (compound index auctionId ASC, timestamp DESC)
 
 ### Khoảng trống trước production
 
-1. Freeze thành công nhưng auction commit lỗi cần saga/compensating action và reconciliation.
+1. Rollback thông thường sau freeze đã có compensating RPC; crash đúng failure window vẫn cần durable saga state/reconciliation.
 2. Wallet cần double-entry ledger, winner settlement, reconciliation và audit tài chính.
 3. Signing key local sinh lại khi restart; production cần KMS/Vault, persistent keys và rotation.
 4. Cần CSRF/origin hardening đầy đủ, rate limiting, account-link flow, MFA cho admin và secret manager.
