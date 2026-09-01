@@ -165,8 +165,8 @@ services:
       REDIS_PORT: 6379
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
-      RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-omnibid}
-      RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-omnibid}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-omnibid}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-omnibid}
       KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
       IDENTITY_JWK_SET_URI: http://identity-service:8083/.well-known/jwks.json
       OMNIBID_TOKEN_ISSUER: ${OMNIBID_TOKEN_ISSUER:-http://localhost:8083}
@@ -202,8 +202,8 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
-      RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-omnibid}
-      RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-omnibid}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-omnibid}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-omnibid}
       WALLET_GRPC_TARGET: static://wallet-service:9091
       IDENTITY_JWK_SET_URI: http://identity-service:8083/.well-known/jwks.json
       OMNIBID_TOKEN_ISSUER: ${OMNIBID_TOKEN_ISSUER:-http://localhost:8083}
