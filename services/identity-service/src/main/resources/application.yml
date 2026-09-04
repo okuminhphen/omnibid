@@ -43,11 +43,14 @@ omnibid:
     refresh-token-ttl: P30D
     refresh-cookie-name: omnibid_refresh
     refresh-cookie-secure: ${AUTH_COOKIE_SECURE:false}
-    allowed-origins:
-      - ${FRONTEND_ORIGIN:http://localhost:3000}
+    refresh-cookie-same-site: ${AUTH_COOKIE_SAME_SITE:Lax}
+    allowed-origins: ${FRONTEND_ORIGINS:${FRONTEND_ORIGIN:http://localhost:3000}}
     google:
       enabled: ${GOOGLE_AUTH_ENABLED:false}
       client-id: ${GOOGLE_CLIENT_ID:}
       jwk-set-uri: https://www.googleapis.com/oauth2/v3/certs
+    admin:
+      email: ${OMNIBID_ADMIN_EMAIL:}
+      display-name: ${OMNIBID_ADMIN_DISPLAY_NAME:OmniBid Administrator}
     kafka:
       identity-topic: ${IDENTITY_TOPIC:identity-events}

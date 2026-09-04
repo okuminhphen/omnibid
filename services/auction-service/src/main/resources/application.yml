@@ -11,15 +11,21 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     properties:
       hibernate:
         jdbc:
           time_zone: UTC
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
   data:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      repositories:
+        enabled: false
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
@@ -50,12 +56,18 @@ management:
         include: health,info
 
 security:
+  cors:
+    allowed-origins: ${FRONTEND_ORIGINS:${FRONTEND_ORIGIN:http://localhost:3000}}
   jwt:
     jwk-set-uri: ${IDENTITY_JWK_SET_URI:http://localhost:8083/.well-known/jwks.json}
     issuer: ${OMNIBID_TOKEN_ISSUER:http://localhost:8083}
     audience: ${OMNIBID_TOKEN_AUDIENCE:omnibid-api}
 
 omnibid:
+  outbox:
+    fixed-delay-ms: ${AUCTION_OUTBOX_DELAY_MS:1000}
+  auction:
+    auto-end-delay-ms: ${AUCTION_AUTO_END_DELAY_MS:5000}
   kafka:
     bid-topic: ${BID_TOPIC:bid-events}
   rabbitmq:

@@ -8,18 +8,16 @@ export interface Auction {
   currentPrice: number;
   stepPrice: number;
   depositAmount: number;
-  winningUserId: string | null;
-  highestBidderId: string | null;
+  leadingBidderAlias: string | null;
   startTime: string;
   endTime: string;
-  endsAt: string;
   version: number;
 }
 
 export interface BidHistory {
   bidId: string;
   auctionId: string;
-  userId: string;
+  bidderAlias: string;
   amount: number;
   placedAt: string;
 }
@@ -47,9 +45,7 @@ export interface WalletTransaction {
 export interface BidResponse {
   bidId: string;
   auctionId: string;
-  bidderId: string;
   amount: number;
-  walletTransactionId: string;
   placedAt: string;
 }
 

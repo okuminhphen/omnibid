@@ -7,6 +7,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.concurrent.TimeUnit;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -18,18 +20,15 @@ public class KafkaProducerService {
     private String bidTopic;
 
     public void sendBidEvent(BidPlacedEvent event) {
-        kafkaTemplate.send(bidTopic, event.auctionId().toString(), event)
-                .whenComplete((result, error) -> {
-                    if (error != null) {
-                        log.error("Could not publish bid event {}", event.bidId(), error);
-                        return;
-                    }
-                    log.debug(
-                            "Published bid event {} to partition {} at offset {}",
-                            event.bidId(),
-                            result.getRecordMetadata().partition(),
-                            result.getRecordMetadata().offset()
-                    );
-                });
+        try {
+            kafkaTemplate.send(bidTopic, event.auctionId().toString(), event)
+                    .get(5, TimeUnit.SECONDS);
+            log.debug("Published bid event {}", event.bidId());
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Kafka publish was interrupted", exception);
+        } catch (Exception exception) {
+            throw new IllegalStateException("Could not publish bid event " + event.bidId(), exception);
+        }
     }
 }

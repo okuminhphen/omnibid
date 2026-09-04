@@ -40,11 +40,8 @@ class WalletAccountServiceTest {
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID();
-        wallet = new Wallet();
-        wallet.setId(UUID.randomUUID());
-        wallet.setUserId(userId);
-        wallet.setBalance(new BigDecimal("1000.00"));
-        wallet.setFrozenBalance(new BigDecimal("100.00"));
+        wallet = Wallet.open(UUID.randomUUID(), userId, new BigDecimal("1000.00"));
+        wallet.freeze(new BigDecimal("100.00"));
     }
 
     @Test
@@ -66,11 +63,10 @@ class WalletAccountServiceTest {
 
     @Test
     void duplicateTopUpReturnsWalletWithoutCreditingAgain() {
-        WalletTransaction duplicate = new WalletTransaction();
-        duplicate.setWalletId(wallet.getId());
-        duplicate.setAmount(new BigDecimal("500.0"));
-        duplicate.setType(WalletTransactionType.TOP_UP);
-        duplicate.setStatus(WalletTransactionStatus.SUCCESS);
+        WalletTransaction duplicate = WalletTransaction.succeeded(
+                UUID.randomUUID(), wallet.getId(), null, new BigDecimal("500.0"),
+                WalletTransactionType.TOP_UP, "top-up-key"
+        );
 
         when(walletRepository.findByUserIdForUpdate(userId)).thenReturn(Optional.of(wallet));
         when(transactionRepository.findByIdempotencyKey("top-up-key"))
@@ -80,5 +76,37 @@ class WalletAccountServiceTest {
 
         assertThat(result.getBalance()).isEqualByComparingTo("1000.00");
         verify(transactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void freezeResultDistinguishesNewReservationFromIdempotentReplay() {
+        UUID auctionId = UUID.randomUUID();
+        when(walletRepository.findByUserIdForUpdate(userId)).thenReturn(Optional.of(wallet));
+        when(transactionRepository.findByIdempotencyKey("deposit-key"))
+                .thenReturn(Optional.empty());
+        when(transactionRepository.findFirstByWalletIdAndAuctionIdAndStatusOrderByCreatedAtDesc(
+                wallet.getId(), auctionId, WalletTransactionStatus.SUCCESS
+        )).thenReturn(Optional.empty());
+
+        FreezeResult created = service.freezeDeposit(
+                "deposit-key", userId, auctionId, new BigDecimal("50.00")
+        );
+
+        assertThat(created.success()).isTrue();
+        assertThat(created.newlyCreated()).isTrue();
+
+        WalletTransaction existing = WalletTransaction.succeeded(
+                created.transactionId(), wallet.getId(), auctionId, new BigDecimal("50.00"),
+                WalletTransactionType.FREEZE, "deposit-key"
+        );
+        when(transactionRepository.findByIdempotencyKey("deposit-key"))
+                .thenReturn(Optional.of(existing));
+
+        FreezeResult replay = service.freezeDeposit(
+                "deposit-key", userId, auctionId, new BigDecimal("50.00")
+        );
+        assertThat(replay.success()).isTrue();
+        assertThat(replay.newlyCreated()).isFalse();
+        assertThat(replay.transactionId()).isEqualTo(created.transactionId());
     }
 }

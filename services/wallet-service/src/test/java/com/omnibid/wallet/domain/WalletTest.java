@@ -11,9 +11,10 @@ class WalletTest {
 
     @Test
     void freezesOnlyFromAvailableBalance() {
-        Wallet wallet = new Wallet();
-        wallet.setBalance(new BigDecimal("100.00"));
-        wallet.setFrozenBalance(new BigDecimal("20.00"));
+        Wallet wallet = Wallet.open(
+                java.util.UUID.randomUUID(), java.util.UUID.randomUUID(), new BigDecimal("100.00")
+        );
+        wallet.freeze(new BigDecimal("20.00"));
 
         assertThat(wallet.getAvailableBalance()).isEqualByComparingTo("80.00");
         assertThat(wallet.hasEnoughAvailableBalance(new BigDecimal("80.00"))).isTrue();
@@ -31,9 +32,10 @@ class WalletTest {
 
     @Test
     void refundMovesMoneyOutOfFrozenBalanceWithoutChangingTotalBalance() {
-        Wallet wallet = new Wallet();
-        wallet.setBalance(new BigDecimal("100.00"));
-        wallet.setFrozenBalance(new BigDecimal("40.00"));
+        Wallet wallet = Wallet.open(
+                java.util.UUID.randomUUID(), java.util.UUID.randomUUID(), new BigDecimal("100.00")
+        );
+        wallet.freeze(new BigDecimal("40.00"));
 
         wallet.refundFrozen(new BigDecimal("15.00"));
 

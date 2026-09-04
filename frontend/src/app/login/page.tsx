@@ -1,81 +1,61 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { GoogleOneTap } from "@/components/GoogleOneTap";
 import { useAuth } from "@/components/AuthProvider";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-
-const DEV_ACCOUNTS = [
-  { alias: "customer-a", label: "Customer A", note: "Dùng cửa sổ thường" },
-  { alias: "customer-b", label: "Customer B", note: "Dùng cửa sổ ẩn danh" },
-  { alias: "admin", label: "Administrator", note: "Role ADMIN" }
-];
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, hydrated, loginDev } = useAuth();
-  const [submitting, setSubmitting] = useState<string | null>(null);
-  const [error, setError] = useState("");
+  const { user, hydrated } = useAuth();
   const finishLogin = useCallback(() => router.replace("/"), [router]);
 
   useEffect(() => {
     if (hydrated && user) finishLogin();
   }, [finishLogin, hydrated, user]);
 
-  async function login(alias: string) {
-    setSubmitting(alias);
-    setError("");
-    try {
-      await loginDev(alias);
-      finishLogin();
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Đăng nhập thất bại.");
-    } finally {
-      setSubmitting(null);
-    }
-  }
-
   return (
-    <main className="fine-grid min-h-[calc(100vh-4rem)] px-5 py-12 sm:py-20">
-      <Card className="mx-auto max-w-lg overflow-hidden shadow-2xl shadow-slate-200/70">
-        <div className="bg-slate-950 px-7 py-8 text-white sm:px-10">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-400">Secure identity boundary</p>
-          <h1 className="mt-3 text-3xl font-black tracking-tight">Đăng nhập OmniBid</h1>
-          <p className="mt-3 text-sm leading-6 text-slate-400">Access token sống ngắn nằm trong memory; refresh token được bảo vệ trong HttpOnly cookie và xoay vòng sau mỗi lần dùng.</p>
-        </div>
-        <CardContent className="space-y-7 p-7 sm:p-10">
-          <GoogleOneTap onSuccess={finishLogin} />
-
-          <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
-            <span className="h-px flex-1 bg-slate-200" />
-            Local concurrency lab
-            <span className="h-px flex-1 bg-slate-200" />
+    <main className="min-h-[calc(100vh-4.5rem)] border-b border-stone-300">
+      <div className="mx-auto grid max-w-[1200px] lg:grid-cols-[0.9fr_1.1fr]">
+        <section className="flex min-h-[390px] flex-col justify-between border-b border-stone-300 px-5 py-12 sm:px-8 sm:py-16 lg:min-h-[680px] lg:border-b-0 lg:border-r lg:px-12 lg:py-20">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#b43a2f]">Tài khoản OmniBid</p>
+            <h1 className="display-serif mt-5 max-w-md text-5xl leading-[1.02] tracking-[-0.04em] text-stone-950 sm:text-6xl">
+              Một tài khoản cho toàn bộ hành trình đấu giá.
+            </h1>
+            <p className="mt-6 max-w-sm text-base leading-7 text-stone-600">
+              Theo dõi phiên đấu giá, quản lý tiền cọc và xem lại lịch sử giao dịch của riêng bạn.
+            </p>
           </div>
-
-          <div className="space-y-3">
-            {DEV_ACCOUNTS.map((account) => (
-              <Button
-                key={account.alias}
-                variant="outline"
-                disabled={Boolean(submitting)}
-                onClick={() => void login(account.alias)}
-                className="h-auto w-full justify-between px-4 py-3"
-              >
-                <span className="text-left">
-                  <span className="block font-black text-slate-900">{account.label}</span>
-                  <span className="mt-0.5 block text-xs font-medium text-slate-500">{account.note}</span>
-                </span>
-                <span>{submitting === account.alias ? "Đang vào..." : "→"}</span>
-              </Button>
-            ))}
+          <div className="mt-12 grid max-w-md grid-cols-2 gap-6 border-t border-stone-300 pt-5 text-xs leading-5 text-stone-500">
+            <p><span className="block font-semibold text-stone-800">Không cần mật khẩu</span>Google xác thực danh tính của bạn.</p>
+            <p><span className="block font-semibold text-stone-800">Quyền riêng biệt</span>Mỗi người có ví và lịch sử riêng.</p>
           </div>
+        </section>
 
-          {error && <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</p>}
-          <p className="text-xs leading-5 text-slate-500">Tài khoản dev chỉ tồn tại ở Spring profile <code>local</code> và không được bật trong production.</p>
-        </CardContent>
-      </Card>
+        <section className="flex items-center px-5 py-12 sm:px-8 lg:px-16">
+          <div className="w-full max-w-md lg:mx-auto">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-stone-500">Đăng nhập hoặc đăng ký</p>
+            <h2 className="display-serif mt-3 text-4xl tracking-[-0.025em] text-stone-950">Tiếp tục với Google</h2>
+            <p className="mt-3 text-sm leading-6 text-stone-500">
+              Nếu email chưa tồn tại, OmniBid sẽ tự tạo một tài khoản khách hàng mới sau khi Google xác thực thành công.
+            </p>
+
+            <div className="mt-8 border-y border-stone-300 py-8">
+              <GoogleOneTap onSuccess={finishLogin} />
+            </div>
+
+            <div className="mt-7 space-y-4 text-xs leading-5 text-stone-500">
+              <p>
+                Bằng việc tiếp tục, bạn đồng ý để OmniBid lưu hồ sơ cơ bản và các phiên đăng nhập phục vụ bảo mật tài khoản.
+              </p>
+              <p className="border-l-2 border-[#b43a2f] pl-4">
+                Tài khoản quản trị không được tạo từ giao diện. Quyền ADMIN chỉ được cấp từ cấu hình bảo mật của identity-service.
+              </p>
+            </div>
+          </div>
+        </section>
+      </div>
     </main>
   );
 }

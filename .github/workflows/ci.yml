@@ -64,3 +64,30 @@ jobs:
 
       - name: Build Next.js production bundle
         run: npm run build
+
+  deployment-ci:
+    name: Container · ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - identity-service
+          - auction-service
+          - wallet-service
+          - audit-service
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Validate Docker Compose
+        run: docker compose config --quiet
+
+      - name: Build production backend image
+        run: >-
+          docker build
+          --file services/${{ matrix.service }}/Dockerfile
+          --tag omnibid/${{ matrix.service }}:ci
+          .

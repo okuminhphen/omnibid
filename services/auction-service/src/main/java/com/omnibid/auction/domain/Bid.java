@@ -7,7 +7,6 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -18,7 +17,6 @@ import java.util.UUID;
         @UniqueConstraint(name = "uk_bid_idempotency_key", columnNames = "idempotency_key")
 })
 @Getter
-@Setter
 @NoArgsConstructor
 public class Bid {
 
@@ -42,4 +40,37 @@ public class Bid {
 
     @Column(name = "placed_at", nullable = false)
     private Instant placedAt;
+
+    public static Bid place(
+            UUID id,
+            UUID auctionId,
+            UUID bidderId,
+            BigDecimal amount,
+            String idempotencyKey,
+            UUID walletTransactionId,
+            Instant placedAt
+    ) {
+        if (id == null || auctionId == null || bidderId == null || walletTransactionId == null) {
+            throw new IllegalArgumentException("Bid identifiers are required");
+        }
+        if (amount == null || amount.signum() <= 0) {
+            throw new IllegalArgumentException("Bid amount must be positive");
+        }
+        if (idempotencyKey == null || idempotencyKey.isBlank() || idempotencyKey.length() > 100) {
+            throw new IllegalArgumentException("Bid idempotency key must contain 1-100 characters");
+        }
+        if (placedAt == null) {
+            throw new IllegalArgumentException("Bid placedAt is required");
+        }
+
+        Bid bid = new Bid();
+        bid.id = id;
+        bid.auctionId = auctionId;
+        bid.bidderId = bidderId;
+        bid.amount = amount;
+        bid.idempotencyKey = idempotencyKey;
+        bid.walletTransactionId = walletTransactionId;
+        bid.placedAt = placedAt;
+        return bid;
+    }
 }

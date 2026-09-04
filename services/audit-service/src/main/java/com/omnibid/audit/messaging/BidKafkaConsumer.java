@@ -21,6 +21,9 @@ public class BidKafkaConsumer {
             containerFactory = "bidKafkaListenerContainerFactory"
     )
     public void consume(BidPlacedEvent event) {
+        if (event == null || !event.hasSupportedSchema()) {
+            throw new IllegalArgumentException("Unsupported BidPlaced event schema");
+        }
         try {
             repository.insert(BidAuditLog.from(event));
             log.debug("Stored audit log for bid {}", event.bidId());

@@ -35,6 +35,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/actuator/health", "/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/auctions/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auctions").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auctions/*/activate").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/auctions/*/end").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/auctions/*/bid",

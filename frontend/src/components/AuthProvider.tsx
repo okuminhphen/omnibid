@@ -11,7 +11,6 @@ import {
 import {
   bootstrapAuthSession,
   getAuthState,
-  loginWithDevAccount,
   logoutAuthSession,
   subscribeAuth
 } from "@/services/authSession";
@@ -20,7 +19,6 @@ import type { AuthState } from "@/types/auth";
 interface AuthContextValue extends AuthState {
   isAuthenticated: boolean;
   isAdmin: boolean;
-  loginDev: (alias: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -38,7 +36,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ...state,
     isAuthenticated: Boolean(state.accessToken && state.user),
     isAdmin: state.user?.roles.includes("ADMIN") ?? false,
-    loginDev: loginWithDevAccount,
     logout: logoutAuthSession
   }), [state]);
 

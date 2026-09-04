@@ -1,15 +1,28 @@
 name: omnibid
 
+x-app-common: &app-common
+  restart: unless-stopped
+  networks: [omnibid-network]
+  read_only: true
+  tmpfs:
+    - /tmp
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: omnibid-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-omnibid}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-omnibid}
       POSTGRES_DB: postgres
     ports:
-      - "5432:5432"
+      - "${INFRA_BIND_ADDRESS:-127.0.0.1}:${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
@@ -22,9 +35,8 @@ services:
 
   mongodb:
     image: mongo:7-jammy
-    container_name: omnibid-mongodb
     ports:
-      - "27017:27017"
+      - "${INFRA_BIND_ADDRESS:-127.0.0.1}:${MONGODB_HOST_PORT:-27017}:27017"
     volumes:
       - mongo-data:/data/db
     healthcheck:
@@ -36,10 +48,9 @@ services:
 
   redis:
     image: redis:7.4-alpine
-    container_name: omnibid-redis
     command: redis-server --appendonly yes
     ports:
-      - "6379:6379"
+      - "${INFRA_BIND_ADDRESS:-127.0.0.1}:${REDIS_HOST_PORT:-6379}:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -51,13 +62,12 @@ services:
 
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
-    container_name: omnibid-rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-omnibid}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-omnibid}
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "${INFRA_BIND_ADDRESS:-127.0.0.1}:${RABBITMQ_HOST_PORT:-5672}:5672"
+      - "${INFRA_BIND_ADDRESS:-127.0.0.1}:${RABBITMQ_MANAGEMENT_HOST_PORT:-15672}:15672"
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
@@ -69,7 +79,6 @@ services:
 
   redpanda:
     image: redpandadata/redpanda:v24.2.10
-    container_name: omnibid-redpanda
     command:
       - redpanda
       - start
@@ -80,10 +89,10 @@ services:
       - --node-id=0
       - --check=false
       - --kafka-addr=INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
-      - --advertise-kafka-addr=INTERNAL://redpanda:29092,EXTERNAL://localhost:9092
+      - --advertise-kafka-addr=INTERNAL://redpanda:29092,EXTERNAL://${KAFKA_ADVERTISED_HOST:-localhost}:${KAFKA_HOST_PORT:-9092}
     ports:
-      - "9092:9092"
-      - "9644:9644"
+      - "${INFRA_BIND_ADDRESS:-127.0.0.1}:${KAFKA_HOST_PORT:-9092}:9092"
+      - "${INFRA_BIND_ADDRESS:-127.0.0.1}:${REDPANDA_ADMIN_HOST_PORT:-9644}:9644"
     volumes:
       - redpanda-data:/var/lib/redpanda/data
     healthcheck:
@@ -95,16 +104,14 @@ services:
 
   localstack:
     image: localstack/localstack:3.8
-    container_name: omnibid-localstack
     environment:
       SERVICES: s3
       AWS_DEFAULT_REGION: ap-southeast-1
       DEBUG: ${LOCALSTACK_DEBUG:-0}
     ports:
-      - "4566:4566"
+      - "${INFRA_BIND_ADDRESS:-127.0.0.1}:${LOCALSTACK_HOST_PORT:-4566}:4566"
     volumes:
       - localstack-data:/var/lib/localstack
-      - /var/run/docker.sock:/var/run/docker.sock
     healthcheck:
       test: ["CMD-SHELL", "curl -fs http://localhost:4566/_localstack/health | grep -Eq '\"s3\": \"(running|available)\"'"]
       interval: 10s
@@ -112,9 +119,154 @@ services:
       retries: 15
     networks: [omnibid-network]
 
+  identity-service:
+    <<: *app-common
+    image: omnibid/identity-service:${OMNIBID_IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: services/identity-service/Dockerfile
+    environment:
+      SERVER_PORT: 8083
+      SPRING_PROFILES_ACTIVE: ${IDENTITY_ACTIVE_PROFILE:-local}
+      IDENTITY_DB_URL: jdbc:postgresql://postgres:5432/identity_db
+      POSTGRES_USER: ${POSTGRES_USER:-omnibid}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-omnibid}
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+      OMNIBID_TOKEN_ISSUER: ${OMNIBID_TOKEN_ISSUER:-http://localhost:8083}
+      OMNIBID_TOKEN_AUDIENCE: ${OMNIBID_TOKEN_AUDIENCE:-omnibid-api}
+      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://localhost:3000}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      AUTH_COOKIE_SAME_SITE: ${AUTH_COOKIE_SAME_SITE:-Lax}
+      GOOGLE_AUTH_ENABLED: ${GOOGLE_AUTH_ENABLED:-false}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      OMNIBID_ADMIN_EMAIL: ${OMNIBID_ADMIN_EMAIL:-}
+      OMNIBID_ADMIN_DISPLAY_NAME: ${OMNIBID_ADMIN_DISPLAY_NAME:-OmniBid Administrator}
+    ports:
+      - "${APP_BIND_ADDRESS:-127.0.0.1}:${IDENTITY_HOST_PORT:-8083}:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+
+  wallet-service:
+    <<: *app-common
+    image: omnibid/wallet-service:${OMNIBID_IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: services/wallet-service/Dockerfile
+    environment:
+      SERVER_PORT: 8081
+      GRPC_SERVER_PORT: 9091
+      WALLET_DB_URL: jdbc:postgresql://postgres:5432/wallet_db
+      POSTGRES_USER: ${POSTGRES_USER:-omnibid}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-omnibid}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-omnibid}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-omnibid}
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+      IDENTITY_JWK_SET_URI: http://identity-service:8083/.well-known/jwks.json
+      OMNIBID_TOKEN_ISSUER: ${OMNIBID_TOKEN_ISSUER:-http://localhost:8083}
+      OMNIBID_TOKEN_AUDIENCE: ${OMNIBID_TOKEN_AUDIENCE:-omnibid-api}
+      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://localhost:3000}
+    ports:
+      - "${APP_BIND_ADDRESS:-127.0.0.1}:${WALLET_HOST_PORT:-8081}:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+      identity-service:
+        condition: service_healthy
+
+  auction-service:
+    <<: *app-common
+    image: omnibid/auction-service:${OMNIBID_IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: services/auction-service/Dockerfile
+    environment:
+      SERVER_PORT: 8080
+      AUCTION_DB_URL: jdbc:postgresql://postgres:5432/auction_db
+      POSTGRES_USER: ${POSTGRES_USER:-omnibid}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-omnibid}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-omnibid}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-omnibid}
+      WALLET_GRPC_TARGET: static://wallet-service:9091
+      IDENTITY_JWK_SET_URI: http://identity-service:8083/.well-known/jwks.json
+      OMNIBID_TOKEN_ISSUER: ${OMNIBID_TOKEN_ISSUER:-http://localhost:8083}
+      OMNIBID_TOKEN_AUDIENCE: ${OMNIBID_TOKEN_AUDIENCE:-omnibid-api}
+      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://localhost:3000}
+    ports:
+      - "${APP_BIND_ADDRESS:-127.0.0.1}:${AUCTION_HOST_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+      identity-service:
+        condition: service_healthy
+      wallet-service:
+        condition: service_healthy
+
+  audit-service:
+    <<: *app-common
+    image: omnibid/audit-service:${OMNIBID_IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: services/audit-service/Dockerfile
+    environment:
+      MONGODB_URI: mongodb://mongodb:27017/omnibid_audit
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+
+  gateway:
+    image: caddy:2.8-alpine
+    profiles: [edge]
+    restart: unless-stopped
+    environment:
+      OMNIBID_DOMAIN: ${OMNIBID_DOMAIN:-example.com}
+      ACME_EMAIL: ${ACME_EMAIL:-dev@example.com}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [omnibid-network]
+    depends_on:
+      identity-service:
+        condition: service_healthy
+      wallet-service:
+        condition: service_healthy
+      auction-service:
+        condition: service_healthy
+
 networks:
   omnibid-network:
-    name: omnibid-network
+    driver: bridge
 
 volumes:
   postgres-data:
@@ -123,3 +275,5 @@ volumes:
   rabbitmq-data:
   redpanda-data:
   localstack-data:
+  caddy-data:
+  caddy-config:

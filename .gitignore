@@ -17,6 +17,7 @@ npm-debug.log*
 .env
 .env.*
 !.env.example
+!deploy/.env.backend.example
 **/application-local.yml
 
 # IDE / OS

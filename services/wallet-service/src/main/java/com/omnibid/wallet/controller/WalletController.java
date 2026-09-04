@@ -30,14 +30,11 @@ public class WalletController {
     @PostMapping("/{userId}/top-up")
     public WalletResponse topUp(
             @PathVariable UUID userId,
-            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
+            @RequestHeader("X-Idempotency-Key") String idempotencyKey,
             @Valid @RequestBody TopUpRequest request
     ) {
-        String effectiveIdempotencyKey = idempotencyKey == null || idempotencyKey.isBlank()
-                ? UUID.randomUUID().toString()
-                : idempotencyKey.trim();
         return WalletResponse.from(
-                walletAccountService.topUp(userId, request.amount(), effectiveIdempotencyKey)
+                walletAccountService.topUp(userId, request.amount(), idempotencyKey.trim())
         );
     }
 }

@@ -9,7 +9,6 @@ import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
@@ -21,7 +20,6 @@ import java.util.UUID;
         @Index(name = "uk_wallet_transaction_idempotency", columnList = "idempotency_key", unique = true)
 })
 @Getter
-@Setter
 @NoArgsConstructor
 public class WalletTransaction {
 
@@ -51,4 +49,32 @@ public class WalletTransaction {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
+
+    public static WalletTransaction succeeded(
+            UUID id,
+            UUID walletId,
+            UUID auctionId,
+            BigDecimal amount,
+            WalletTransactionType type,
+            String idempotencyKey
+    ) {
+        if (id == null || walletId == null || type == null) {
+            throw new IllegalArgumentException("Wallet transaction identifiers and type are required");
+        }
+        if (amount == null || amount.signum() <= 0) {
+            throw new IllegalArgumentException("Wallet transaction amount must be positive");
+        }
+        if (idempotencyKey == null || idempotencyKey.isBlank() || idempotencyKey.length() > 120) {
+            throw new IllegalArgumentException("Wallet transaction idempotency key must contain 1-120 characters");
+        }
+        WalletTransaction transaction = new WalletTransaction();
+        transaction.id = id;
+        transaction.walletId = walletId;
+        transaction.auctionId = auctionId;
+        transaction.amount = amount;
+        transaction.type = type;
+        transaction.status = WalletTransactionStatus.SUCCESS;
+        transaction.idempotencyKey = idempotencyKey;
+        return transaction;
+    }
 }

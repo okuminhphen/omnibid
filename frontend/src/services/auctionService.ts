@@ -22,14 +22,8 @@ export async function placeBid(
 }
 
 export async function getBidHistory(auctionId: string): Promise<BidHistory[]> {
-  const response = await api.get<BidResponse[]>(`/api/v1/auctions/${auctionId}/bids`);
-  return response.data.map((bid) => ({
-    bidId: bid.bidId,
-    auctionId: bid.auctionId,
-    userId: bid.bidderId,
-    amount: bid.amount,
-    placedAt: bid.placedAt
-  }));
+  const response = await api.get<BidHistory[]>(`/api/v1/auctions/${auctionId}/bids`);
+  return response.data;
 }
 
 export const auctionService = {

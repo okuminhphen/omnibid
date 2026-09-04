@@ -4,6 +4,12 @@
 
 :root {
   color-scheme: light;
+  --paper: #f4f1ea;
+  --surface: #fffdf9;
+  --ink: #171714;
+  --muted: #69675f;
+  --line: #d8d3c9;
+  --accent: #b43a2f;
 }
 
 * {
@@ -17,16 +23,26 @@ html {
 body {
   min-height: 100vh;
   margin: 0;
-  background:
-    radial-gradient(circle at 0% 0%, rgba(251, 146, 60, 0.12), transparent 28rem),
-    #f8fafc;
-  color: #0f172a;
+  background: var(--paper);
+  color: var(--ink);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
 ::selection {
-  background: #fed7aa;
-  color: #7c2d12;
+  background: #d8b4ad;
+  color: #32130f;
+}
+
+a,
+button,
+input,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.display-serif {
+  font-family: Iowan Old Style, Baskerville, "Times New Roman", ui-serif, Georgia, serif;
 }
 
 @keyframes price-pop {
@@ -42,11 +58,4 @@ body {
 
 .animate-price-pop {
   animation: price-pop 360ms ease-out;
-}
-
-.fine-grid {
-  background-image:
-    linear-gradient(rgba(148, 163, 184, 0.09) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.09) 1px, transparent 1px);
-  background-size: 32px 32px;
 }

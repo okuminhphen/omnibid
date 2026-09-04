@@ -1,9 +1,9 @@
 package com.omnibid.auction.controller;
 
 import com.omnibid.auction.dto.PlaceBidRequest;
-import com.omnibid.auction.repository.AuctionRepository;
-import com.omnibid.auction.repository.BidRepository;
+import com.omnibid.auction.service.AuctionQueryService;
 import com.omnibid.auction.service.AuctionService;
+import com.omnibid.auction.service.AuctionLifecycleUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -20,11 +20,11 @@ import static org.mockito.Mockito.verify;
 class AuctionControllerTest {
 
     @Mock
-    private AuctionRepository auctionRepository;
-    @Mock
-    private BidRepository bidRepository;
+    private AuctionQueryService queryService;
     @Mock
     private AuctionService auctionService;
+    @Mock
+    private AuctionLifecycleUseCase lifecycleUseCase;
 
     @InjectMocks
     private AuctionController controller;

@@ -21,8 +21,7 @@ public class BrowserOriginFilter extends OncePerRequestFilter {
     private static final Set<String> COOKIE_MUTATING_PATHS = Set.of(
             "/api/v1/auth/google",
             "/api/v1/auth/refresh",
-            "/api/v1/auth/logout",
-            "/api/v1/auth/dev/login"
+            "/api/v1/auth/logout"
     );
 
     private final IdentityProperties properties;

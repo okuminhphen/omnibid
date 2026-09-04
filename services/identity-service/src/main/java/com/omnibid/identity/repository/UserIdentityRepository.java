@@ -12,4 +12,6 @@ public interface UserIdentityRepository extends JpaRepository<UserIdentity, UUID
             IdentityProvider provider,
             String providerSubject
     );
+
+    boolean existsByUserId(UUID userId);
 }

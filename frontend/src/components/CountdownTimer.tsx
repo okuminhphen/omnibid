@@ -8,9 +8,9 @@ function getRemaining(target: string): number {
 
 function Segment({ value, label }: { value: string; label: string }) {
   return (
-    <div className="min-w-16 rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-center">
-      <strong className="block text-2xl font-black tabular-nums text-white">{value}</strong>
-      <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">{label}</span>
+    <div className="min-w-14 border-l border-stone-300 px-3 first:border-l-0 first:pl-0 sm:px-4">
+      <strong className="display-serif block text-3xl font-normal tabular-nums text-stone-950">{value}</strong>
+      <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-stone-500">{label}</span>
     </div>
   );
 }
@@ -26,10 +26,10 @@ export function CountdownTimer({ endTime }: { endTime: string }) {
   }, [endTime]);
 
   if (remaining === null) {
-    return <div className="h-[74px] animate-pulse rounded-2xl bg-white/5" />;
+    return <div className="h-[62px] animate-pulse bg-stone-200" />;
   }
   if (remaining === 0) {
-    return <p className="rounded-2xl bg-rose-500/15 px-4 py-5 text-center font-bold text-rose-300">Phiên đã kết thúc</p>;
+    return <p className="border border-red-300 bg-red-50 px-4 py-5 text-center font-semibold text-red-800">Phiên đã kết thúc</p>;
   }
 
   const totalSeconds = Math.floor(remaining / 1_000);
@@ -40,7 +40,7 @@ export function CountdownTimer({ endTime }: { endTime: string }) {
   const pad = (value: number) => String(value).padStart(2, "0");
 
   return (
-    <div className="grid grid-cols-4 gap-2" aria-label="Thời gian còn lại">
+    <div className="grid grid-cols-4" aria-label="Thời gian còn lại">
       <Segment value={pad(days)} label="Ngày" />
       <Segment value={pad(hours)} label="Giờ" />
       <Segment value={pad(minutes)} label="Phút" />

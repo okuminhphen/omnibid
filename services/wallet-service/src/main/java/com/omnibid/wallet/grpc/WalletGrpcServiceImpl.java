@@ -3,6 +3,10 @@ package com.omnibid.wallet.grpc;
 import com.omnibid.contract.wallet.v1.FreezeDepositRequest;
 import com.omnibid.contract.wallet.v1.FreezeDepositResponse;
 import com.omnibid.contract.wallet.v1.WalletServiceGrpc;
+import com.omnibid.contract.wallet.v1.ReleaseDepositRequest;
+import com.omnibid.contract.wallet.v1.ReleaseDepositResponse;
+import com.omnibid.wallet.messaging.RefundCommand;
+import com.omnibid.wallet.service.RefundService;
 import com.omnibid.wallet.service.FreezeResult;
 import com.omnibid.wallet.service.WalletAccountService;
 import io.grpc.Status;
@@ -19,6 +23,7 @@ import java.util.UUID;
 public class WalletGrpcServiceImpl extends WalletServiceGrpc.WalletServiceImplBase {
 
     private final WalletAccountService walletAccountService;
+    private final RefundService refundService;
 
     @Override
     public void freezeDeposit(
@@ -38,7 +43,8 @@ public class WalletGrpcServiceImpl extends WalletServiceGrpc.WalletServiceImplBa
             FreezeDepositResponse.Builder response = FreezeDepositResponse.newBuilder()
                     .setSuccess(result.success())
                     .setMessage(result.message())
-                    .setErrorCode(result.errorCode());
+                    .setErrorCode(result.errorCode())
+                    .setNewlyCreated(result.newlyCreated());
             if (result.transactionId() != null) {
                 response.setTransactionId(result.transactionId().toString());
             }
@@ -51,6 +57,39 @@ public class WalletGrpcServiceImpl extends WalletServiceGrpc.WalletServiceImplBa
         } catch (Exception exception) {
             responseObserver.onError(Status.INTERNAL
                     .withDescription("Could not freeze deposit")
+                    .withCause(exception)
+                    .asRuntimeException());
+        }
+    }
+
+    @Override
+    public void releaseDeposit(
+            ReleaseDepositRequest request,
+            StreamObserver<ReleaseDepositResponse> responseObserver
+    ) {
+        try {
+            requireIdempotencyKey(request.getIdempotencyKey());
+            refundService.refund(new RefundCommand(
+                    UUID.fromString(request.getTransactionId()),
+                    UUID.fromString(request.getUserId()),
+                    UUID.fromString(request.getAuctionId()),
+                    new BigDecimal(request.getAmount())
+            ));
+            responseObserver.onNext(ReleaseDepositResponse.newBuilder()
+                    .setSuccess(true)
+                    .setMessage("Deposit released")
+                    .build());
+            responseObserver.onCompleted();
+        } catch (IllegalArgumentException | NoSuchElementException exception) {
+            responseObserver.onNext(ReleaseDepositResponse.newBuilder()
+                    .setSuccess(false)
+                    .setErrorCode("RELEASE_REJECTED")
+                    .setMessage(exception.getMessage() == null ? "Release rejected" : exception.getMessage())
+                    .build());
+            responseObserver.onCompleted();
+        } catch (Exception exception) {
+            responseObserver.onError(Status.INTERNAL
+                    .withDescription("Could not release deposit")
                     .withCause(exception)
                     .asRuntimeException());
         }

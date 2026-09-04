@@ -11,7 +11,7 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     properties:
       hibernate:
         jdbc:
@@ -24,6 +24,8 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      repositories:
+        enabled: false
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
@@ -57,6 +59,8 @@ management:
         include: health,info
 
 security:
+  cors:
+    allowed-origins: ${FRONTEND_ORIGINS:${FRONTEND_ORIGIN:http://localhost:3000}}
   jwt:
     jwk-set-uri: ${IDENTITY_JWK_SET_URI:http://localhost:8083/.well-known/jwks.json}
     issuer: ${OMNIBID_TOKEN_ISSUER:http://localhost:8083}

@@ -1,9 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getApiErrorMessage } from "@/lib/errors";
 import { formatMoney } from "@/lib/utils";
@@ -44,48 +43,54 @@ export function AuctionList() {
   if (loading) {
     return (
       <div className="grid gap-6 md:grid-cols-2">
-        <Skeleton className="h-72" />
-        <Skeleton className="h-72" />
+        <Skeleton className="h-[520px]" />
+        <Skeleton className="h-[520px]" />
       </div>
     );
   }
 
   if (error && auctions.length === 0) {
-    return <div className="rounded-3xl border border-rose-200 bg-rose-50 p-6 text-rose-700">{error}</div>;
+    return <div className="border border-red-300 bg-red-50 p-6 text-red-800">{error}</div>;
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
+    <div className="grid gap-x-7 gap-y-12 md:grid-cols-2">
       {auctions.map((auction, index) => (
-        <Link href={`/auctions/${auction.id}`} key={auction.id} className="group">
-          <Card className="h-full overflow-hidden transition duration-300 hover:-translate-y-1 hover:border-orange-200 hover:shadow-xl">
-            <div className="relative h-44 overflow-hidden bg-slate-950 p-6">
-              <div className="absolute -right-12 -top-16 size-48 rounded-full bg-orange-500/25 blur-3xl" />
-              <div className="absolute inset-x-8 bottom-6 h-14 rotate-[-4deg] rounded-2xl border border-white/10 bg-gradient-to-r from-slate-800 to-slate-700 shadow-2xl">
-                <div className="grid h-full grid-cols-10 gap-1 p-2 opacity-80">
-                  {Array.from({ length: 30 }).map((_, key) => (
-                    <span key={key} className="rounded-[3px] bg-slate-500/50" />
-                  ))}
-                </div>
+        <Link href={`/auctions/${auction.id}`} key={auction.id} className="group block">
+          <article>
+            <div className="relative overflow-hidden border border-stone-300 bg-stone-200">
+              <Image
+                src="/keyboard.svg"
+                alt={auction.title}
+                width={1200}
+                height={900}
+                className="aspect-[4/3] w-full object-cover transition duration-500 group-hover:scale-[1.015]"
+              />
+              <div className="absolute inset-x-0 top-0 flex items-center justify-between p-4 text-[10px] font-semibold uppercase tracking-[0.16em]">
+                <span className="bg-[#fffdf9] px-2.5 py-1.5 text-stone-700">Lô {String(index + 1).padStart(2, "0")}</span>
+                <span className="bg-[#262521] px-2.5 py-1.5 text-white">{auction.status === "ACTIVE" ? "Đang mở" : "Đã đóng"}</span>
               </div>
-              <Badge className={auction.status === "ACTIVE" ? "!border-emerald-400/20 !bg-emerald-400/10 !text-emerald-300" : "!border-white/10 !bg-white/10 !text-slate-300"}>
-                {auction.status === "ACTIVE" && <span className="mr-2 size-1.5 animate-pulse rounded-full bg-emerald-400" />}
-                {auction.status}
-              </Badge>
-              <span className="absolute right-5 top-5 font-mono text-xs text-slate-500">LOT 0{index + 1}</span>
             </div>
-            <div className="p-6">
-              <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-orange-600">Sưu tầm công nghệ</p>
-              <h2 className="min-h-14 text-xl font-black text-slate-950 transition group-hover:text-orange-600">{auction.title}</h2>
-              <div className="mt-6 flex items-end justify-between border-t border-slate-100 pt-5">
+            <div className="pt-5">
+              <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-xs font-medium text-slate-500">Giá hiện tại</p>
-                  <p className="mt-1 text-2xl font-black text-slate-950">{formatMoney(Number(auction.currentPrice))}</p>
+                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#b43a2f]">Thiết kế & công nghệ</p>
+                  <h2 className="display-serif text-2xl leading-tight text-stone-950 transition group-hover:text-[#b43a2f] sm:text-3xl">{auction.title}</h2>
                 </div>
-                <span className="grid size-11 place-items-center rounded-full bg-slate-950 text-xl text-white transition group-hover:bg-orange-500">→</span>
+                <span className="mt-1 text-xl text-stone-400 transition group-hover:translate-x-1 group-hover:text-[#b43a2f]">↗</span>
+              </div>
+              <div className="mt-5 grid grid-cols-2 border-y border-stone-300 py-4">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.12em] text-stone-500">Giá hiện tại</p>
+                  <p className="mt-1 text-lg font-semibold tabular-nums text-stone-950">{formatMoney(Number(auction.currentPrice))}</p>
+                </div>
+                <div className="border-l border-stone-300 pl-5">
+                  <p className="text-[10px] uppercase tracking-[0.12em] text-stone-500">Kết thúc</p>
+                  <p className="mt-1 text-sm font-medium text-stone-800">{new Date(auction.endTime).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</p>
+                </div>
               </div>
             </div>
-          </Card>
+          </article>
         </Link>
       ))}
     </div>

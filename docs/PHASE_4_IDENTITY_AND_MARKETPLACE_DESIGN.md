@@ -829,22 +829,11 @@ Các event quan trọng phải được publish qua transactional outbox thay v�
 - Các profile cùng mở một auction và bid gần đồng thời.
 - UI phải hiển thị anonymous bidder, không lộ email/name.
 
-### Local development không phụ thuộc Google
+### Local development với danh tính thật
 
-Tạo `dev-auth` chỉ hoạt động khi Spring profile là `local`:
+Local dùng OAuth Web Client riêng và Google test users. Không có `dev-auth`, token cố định hoặc account alias trong source. Customer mới được tạo qua cùng luồng production; admin được provision từ `OMNIBID_ADMIN_EMAIL` rồi claim bằng Google credential đã verify.
 
-```text
-POST /internal/dev-auth/token?user=customer-a
-POST /internal/dev-auth/token?user=customer-b
-POST /internal/dev-auth/token?user=admin
-```
-
-Yêu cầu an toàn:
-
-- Bean/controller được bảo vệ bởi `@Profile("local")`.
-- Application phải fail startup nếu `dev-auth` bật trong `staging` hoặc `production`.
-- Không commit token cố định.
-- Seed user có role rõ ràng qua Flyway local migration.
+Khi cần automated test, Spring Security test fixtures ký JWT ngắn hạn trong test scope. Không mở backdoor HTTP chỉ để phục vụ Postman hoặc load test.
 
 ### Automated concurrency test
 
@@ -897,7 +886,7 @@ Frontend không render admin navigation chỉ dựa trên local state; backend v
 
 1. Tạo Maven module `services/identity-service` và database `identity_db`.
 2. Thêm Flyway migration cho identity schema và role seed.
-3. Bọc `DemoDataConfig` hiện tại bằng profile `local`.
+3. Đã loại bỏ `DemoDataConfig`; account/wallet/auction chỉ được tạo qua lifecycle thật hoặc test fixture.
 4. Khi user đăng ký, publish `UserRegisteredEvent`; wallet-service tạo wallet.
 5. Thêm Spring Security Resource Server vào auction/wallet service.
 6. Đổi `PlaceBidRequest(userId, bidAmount)` thành `PlaceBidRequest(bidAmount)`.

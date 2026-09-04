@@ -1,0 +1,16 @@
+.git
+.github
+.idea
+.vscode
+.env
+.env.*
+!.env.example
+
+**/target
+**/node_modules
+**/.next
+**/*.log
+
+frontend
+docs
+*.md

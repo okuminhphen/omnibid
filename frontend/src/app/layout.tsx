@@ -5,8 +5,8 @@ import { SiteHeader } from "@/components/SiteHeader";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "OmniBid — Real-time Auction",
-  description: "Sàn đấu giá real-time xây dựng trên Redis Lock, gRPC, Kafka và RabbitMQ"
+  title: "OmniBid — Nhà đấu giá trực tuyến",
+  description: "Nền tảng đấu giá trực tuyến dành cho những vật phẩm tuyển chọn."
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

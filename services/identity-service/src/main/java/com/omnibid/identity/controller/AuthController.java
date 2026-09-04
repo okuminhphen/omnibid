@@ -47,7 +47,7 @@ public class AuthController {
         ResponseCookie nonceCookie = ResponseCookie.from(GOOGLE_NONCE_COOKIE, nonce.hash())
                 .httpOnly(true)
                 .secure(properties.refreshCookieSecure())
-                .sameSite("Lax")
+                .sameSite(properties.refreshCookieSameSite())
                 .path("/api/v1/auth/google")
                 .maxAge(Duration.ofMinutes(5))
                 .build();
@@ -135,7 +135,7 @@ public class AuthController {
         return ResponseCookie.from(properties.refreshCookieName(), rawRefreshToken)
                 .httpOnly(true)
                 .secure(properties.refreshCookieSecure())
-                .sameSite("Lax")
+                .sameSite(properties.refreshCookieSameSite())
                 .path("/api/v1/auth")
                 .maxAge(properties.refreshTokenTtl())
                 .build();
@@ -145,7 +145,7 @@ public class AuthController {
         return ResponseCookie.from(properties.refreshCookieName(), "")
                 .httpOnly(true)
                 .secure(properties.refreshCookieSecure())
-                .sameSite("Lax")
+                .sameSite(properties.refreshCookieSameSite())
                 .path("/api/v1/auth")
                 .maxAge(Duration.ZERO)
                 .build();
@@ -155,7 +155,7 @@ public class AuthController {
         return ResponseCookie.from(GOOGLE_NONCE_COOKIE, "")
                 .httpOnly(true)
                 .secure(properties.refreshCookieSecure())
-                .sameSite("Lax")
+                .sameSite(properties.refreshCookieSameSite())
                 .path("/api/v1/auth/google")
                 .maxAge(Duration.ZERO)
                 .build();

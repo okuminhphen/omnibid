@@ -55,14 +55,14 @@ public class RefundService {
         // availableBalance = balance - frozenBalance without minting money.
         wallet.refundFrozen(command.amount());
 
-        WalletTransaction transaction = new WalletTransaction();
-        transaction.setId(UUID.randomUUID());
-        transaction.setWalletId(wallet.getId());
-        transaction.setAuctionId(command.auctionId());
-        transaction.setAmount(command.amount());
-        transaction.setType(WalletTransactionType.REFUND);
-        transaction.setStatus(WalletTransactionStatus.SUCCESS);
-        transaction.setIdempotencyKey(idempotencyKey);
+        WalletTransaction transaction = WalletTransaction.succeeded(
+                UUID.randomUUID(),
+                wallet.getId(),
+                command.auctionId(),
+                command.amount(),
+                WalletTransactionType.REFUND,
+                idempotencyKey
+        );
         transactionRepository.save(transaction);
     }
 

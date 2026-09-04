@@ -37,9 +37,11 @@ class KafkaProducerServiceTest {
                 new BigDecimal("250.00"),
                 Instant.now()
         );
-        CompletableFuture<SendResult<String, BidPlacedEvent>> pending = new CompletableFuture<>();
+        @SuppressWarnings("unchecked")
+        SendResult<String, BidPlacedEvent> result = org.mockito.Mockito.mock(SendResult.class);
         ReflectionTestUtils.setField(service, "bidTopic", "bid-events");
-        when(kafkaTemplate.send("bid-events", auctionId.toString(), event)).thenReturn(pending);
+        when(kafkaTemplate.send("bid-events", auctionId.toString(), event))
+                .thenReturn(CompletableFuture.completedFuture(result));
 
         service.sendBidEvent(event);
 

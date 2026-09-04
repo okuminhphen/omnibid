@@ -91,14 +91,6 @@ export async function bootstrapAuthSession(): Promise<void> {
   if (!authState.hydrated) await refreshAuthSession();
 }
 
-export async function loginWithDevAccount(alias: string): Promise<void> {
-  const response = await requestAuth("/api/v1/auth/dev/login", {
-    method: "POST",
-    body: JSON.stringify({ alias })
-  });
-  applyAuthResponse(response);
-}
-
 export async function loginWithGoogle(credential: string, nonce: string): Promise<void> {
   const response = await requestAuth("/api/v1/auth/google", {
     method: "POST",
