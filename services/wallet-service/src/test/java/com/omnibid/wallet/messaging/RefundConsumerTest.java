@@ -14,6 +14,8 @@ import java.math.BigDecimal;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -47,9 +49,8 @@ class RefundConsumerTest {
     }
 
     @Test
-    void reservesRedisKeyThenRefundsAndMarksSuccess() {
-        when(valueOperations.setIfAbsent(key, "PROCESSING", 10, TimeUnit.MINUTES))
-                .thenReturn(true);
+    void refundsThenCachesSuccess() {
+        when(valueOperations.get(key)).thenReturn(null);
 
         consumer.consume(command);
 
@@ -59,12 +60,39 @@ class RefundConsumerTest {
 
     @Test
     void acknowledgesDuplicateWithoutRefundingAgain() {
-        when(valueOperations.setIfAbsent(key, "PROCESSING", 10, TimeUnit.MINUTES))
-                .thenReturn(false);
+        when(valueOperations.get(key)).thenReturn("SUCCESS");
 
         consumer.consume(command);
 
         verify(refundService, never()).refund(command);
-        verify(valueOperations, never()).set(key, "SUCCESS", 30, TimeUnit.DAYS);
+    }
+
+    @Test
+    void staleProcessingMarkerCannotDropARedeliveredRefund() {
+        when(valueOperations.get(key)).thenReturn("PROCESSING");
+
+        consumer.consume(command);
+
+        verify(refundService).refund(command);
+        verify(valueOperations).set(key, "SUCCESS", 30, TimeUnit.DAYS);
+    }
+
+    @Test
+    void redisReadFailureFallsBackToDurableDatabaseIdempotency() {
+        when(valueOperations.get(key)).thenThrow(new IllegalStateException("Redis unavailable"));
+
+        consumer.consume(command);
+
+        verify(refundService).refund(command);
+    }
+
+    @Test
+    void redisWriteFailureDoesNotFailACommittedRefund() {
+        when(valueOperations.get(key)).thenReturn(null);
+        doThrow(new IllegalStateException("Redis unavailable"))
+                .when(valueOperations).set(key, "SUCCESS", 30, TimeUnit.DAYS);
+
+        assertDoesNotThrow(() -> consumer.consume(command));
+        verify(refundService).refund(command);
     }
 }

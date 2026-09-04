@@ -22,25 +22,37 @@ public class RefundConsumer {
         validate(command);
         String key = "idempotent:refund:" + command.transactionId();
 
-        Boolean reserved = redisTemplate.opsForValue().setIfAbsent(
-                key,
-                "PROCESSING",
-                10,
-                TimeUnit.MINUTES
-        );
-        if (!Boolean.TRUE.equals(reserved)) {
+        if (isCachedAsSuccessful(key)) {
             log.info("Skipping duplicate refund transaction {}", command.transactionId());
             return;
         }
 
+        // The PostgreSQL transaction and unique refund:{transactionId} key are the
+        // correctness boundary. A PROCESSING Redis marker is deliberately not used:
+        // acknowledging a redelivery against a stale marker could lose a refund after
+        // a consumer crash. Redis only caches a result after the database commit.
+        refundService.refund(command);
+        cacheSuccessfulResult(key, command);
+    }
+
+    private boolean isCachedAsSuccessful(String key) {
         try {
-            // PostgreSQL also stores a unique refund:{transactionId} key. Redis is the
-            // fast dedupe layer; the database remains the durable safety net.
-            refundService.refund(command);
+            return "SUCCESS".equals(redisTemplate.opsForValue().get(key));
+        } catch (RuntimeException exception) {
+            log.warn("Redis refund dedupe lookup failed for key {}; using PostgreSQL", key, exception);
+            return false;
+        }
+    }
+
+    private void cacheSuccessfulResult(String key, RefundCommand command) {
+        try {
             redisTemplate.opsForValue().set(key, "SUCCESS", 30, TimeUnit.DAYS);
         } catch (RuntimeException exception) {
-            redisTemplate.delete(key);
-            throw exception;
+            log.warn(
+                    "Refund committed but Redis success marker could not be stored for transaction {}",
+                    command.transactionId(),
+                    exception
+            );
         }
     }
 
