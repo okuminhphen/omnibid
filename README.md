@@ -137,7 +137,7 @@ sequenceDiagram
 - Redisson watchdog tự gia hạn lock để critical section không mất lock khi gRPC/DB chậm hơn lease cố định.
 - Auction transactional outbox gắn bid/refund với DB transaction; publisher chỉ đánh dấu hoàn tất sau broker acknowledgement.
 - Scheduler tự tìm tối đa 100 phiên `ACTIVE` hết hạn mỗi lượt và chốt qua cùng distributed lock với API thủ công.
-- Kafka audit log vào MongoDB; RabbitMQ refund có retry, DLQ, Redis fast dedupe và PostgreSQL durable dedupe.
+- Kafka audit log vào MongoDB; RabbitMQ refund có retry/DLQ, Redis `SUCCESS` cache best-effort và PostgreSQL durable dedupe.
 - Flyway sở hữu schema auction/wallet; Hibernate chạy `validate` thay vì tự sửa database bằng `ddl-auto=update`.
 - Bốn backend service có multi-stage Docker build, non-root/read-only runtime, health-gated startup và Caddy HTTPS profile tùy chọn.
 - UI polling gần real-time; có thể mở cửa sổ thường + ẩn danh để đấu giá bằng hai user khác nhau.
@@ -174,7 +174,7 @@ OmniBid/
 ├── deploy/Caddyfile                  # optional public HTTPS edge for a VPS
 ├── docs/
 ├── docker-compose.yml
-└── pom.xml                          # Maven reactor gồm 6 modules
+└── pom.xml                          # 5 child modules; 6 reactor projects tính cả root
 ```
 
 ## Yêu cầu local
@@ -394,7 +394,7 @@ POST   /api/v1/me/wallet/withdrawals
 ## Kiểm chứng hiện tại
 
 - Maven reactor: wallet proto + identity + auction + wallet + audit.
-- Backend hiện có **39 tests**: 35 test không cần Docker đã pass trong lần refactor này; 4 Testcontainers test kiểm tra PostgreSQL schemas và Redis contention sẽ chạy trong GitHub Actions hoặc khi Docker Desktop được bật.
+- Backend hiện có **42 tests**: 38 test không cần Docker đã pass ngày 04/09/2026; 4 Testcontainers test kiểm tra PostgreSQL schemas và Redis contention sẽ chạy trong GitHub Actions hoặc khi Docker Desktop được bật.
 - Frontend có `npm run typecheck` và production `npm run build`.
 
 ## GitHub

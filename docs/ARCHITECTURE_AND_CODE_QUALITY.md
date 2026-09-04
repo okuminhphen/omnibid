@@ -1,8 +1,24 @@
 # OmniBid Architecture and Code Quality
 
-Ngày cập nhật: **31/08/2026**
+Ngày cập nhật: **04/09/2026**
 
 Tài liệu này mô tả kiến trúc đang được code thực thi. Mục tiêu là pragmatic clean architecture cho portfolio microservices, không thêm abstraction nếu chưa có boundary cần thay thế hoặc test độc lập.
+
+## Kết luận audit
+
+OmniBid có cấu trúc **tốt cho một portfolio backend/fresher nâng cao**, nhưng không được mô tả là Clean Architecture hoặc production-ready tuyệt đối. Boundary giữa các microservice, database ownership, auction use case và outbound adapter đã rõ; mức độ áp dụng trong identity, wallet, audit và frontend chưa đồng đều.
+
+| Khu vực | Đánh giá | Bằng chứng / giới hạn |
+|---|---|---|
+| Monorepo và service ownership | Tốt | Contract, bốn service, frontend, deploy và docs tách rõ; không có foreign key xuyên service |
+| Auction application design | Tốt | Command/query use case riêng, controller mỏng, external dependency nằm sau port |
+| OOP/domain invariant | Khá | Auction/wallet dùng behavior và factory; identity entity vẫn có public setter |
+| SOLID/DIP | Khá | External auction adapters tuân DIP; application layer vẫn phụ thuộc trực tiếp Spring Data repository |
+| Messaging correctness | Khá tốt | Outbox, broker acknowledgement và durable consumer dedupe; durable saga/reconciliation còn thiếu |
+| Frontend organization | Cần cải thiện | Ba page component dài 176-292 dòng, nên tách feature hooks/components khi mở rộng |
+| Architecture enforcement | Cần cải thiện | Boundary mới được giữ bằng convention/review; chưa có ArchUnit hoặc module-level architecture test |
+
+Không áp dụng abstraction chỉ để “đủ pattern”. Repository dùng Clean Architecture theo hướng pragmatic: tách ở nơi có failure boundary hoặc cần thay adapter/test độc lập, chấp nhận JPA entity và Spring Data trong service nhỏ.
 
 ## Architectural boundaries
 
@@ -80,6 +96,8 @@ Spring Data repository được dùng trực tiếp trong application layer như
 
 Đây là compensating transaction cho exception/commit failure quan sát được. Nếu process chết sau wallet commit nhưng trước khi chạy compensation, vẫn cần durable saga state và reconciliation job; project không tuyên bố distributed transaction exactly-once.
 
+Refund consumer không ACK dựa trên Redis `PROCESSING` marker. Marker đó có thể còn stale sau consumer crash và làm mất bản redelivery. PostgreSQL transaction cùng unique `refund:{transactionId}` là correctness boundary; Redis chỉ cache `SUCCESS` sau DB commit và lỗi Redis không làm fail một refund đã commit.
+
 ## Public API safety
 
 - Customer identity lấy từ JWT `sub`, không lấy từ bid body.
@@ -99,10 +117,10 @@ Public auction list và bid history giới hạn tối đa 100 item để tránh
 
 ## Verification status
 
-| Gate | Kết quả 31/08/2026 |
+| Gate | Kết quả 04/09/2026 |
 |---|---|
 | Java compile, protobuf generation | Pass |
-| Non-container backend tests | 35 pass, 0 failure/error |
+| Non-container backend tests | 38 pass, 0 failure/error |
 | Testcontainers PostgreSQL/Redis | 4 tests chưa chạy trong phiên này vì Docker đang được giữ tắt; CI chạy bằng `mvn clean verify` |
 | Frontend TypeScript | Pass |
 | Next.js production build | Pass, 6 routes |
@@ -116,6 +134,9 @@ Public auction list và bid history giới hạn tối đa 100 item để tránh
 3. Outbox exponential backoff, poison-event quarantine và backlog metrics.
 4. OpenTelemetry traces, Prometheus/Grafana, structured correlation ID và SLO.
 5. Broker/gRPC integration tests, load test và failure injection.
-6. Product/catalog/media, admin UI, settlement người thắng và double-entry ledger.
+6. Tách `UserAccountService`, `WalletAccountService` và các frontend page lớn theo use case/feature khi scope tăng.
+7. Chuẩn hóa event contract/schema compatibility thay vì duy trì DTO trùng giữa producer và consumer.
+8. Thêm architecture test để chặn controller phụ thuộc repository/infrastructure và domain phụ thuộc application.
+9. Product/catalog/media, admin UI, settlement người thắng và double-entry ledger.
 
 Các khoảng trống này được giữ rõ ràng để CV và phỏng vấn không quảng bá quá mức trạng thái production hiện tại.

@@ -35,11 +35,13 @@ src/main/java/com/omnibid/<service>/
 ├── controller/      # HTTP boundary
 ├── domain/          # aggregate/entity/value enum
 ├── dto/             # request/response contract
-├── repository/      # persistence port
+├── repository/      # Spring Data data access; pragmatic framework dependency
 ├── security/        # JWT/origin/authorization concern
-├── service/         # application use case + outbound port contracts
-├── infrastructure/  # adapters cho Redisson, Redis cache và external systems
-└── messaging/       # Kafka/RabbitMQ producer hoặc consumer
+├── service/         # application facade/use case
+├── service/port/    # outbound contracts không phụ thuộc transport
+├── infrastructure/  # adapter Redisson và Redis cache
+├── grpc/            # gRPC inbound/outbound adapter
+└── messaging/       # Kafka/RabbitMQ adapter và transport DTO
 
 src/main/resources/
 ├── application.yml
@@ -47,6 +49,8 @@ src/main/resources/
 ```
 
 Không phải service nào cũng cần đủ mọi package. Audit service nhỏ hơn vì nhiệm vụ chính là consume event và lưu MongoDB.
+
+Đây là package-by-layer có boundary pragmatic, không phải hexagonal architecture tuyệt đối ở mọi service. Auction đã tách port/adapter rõ nhất; identity và wallet vẫn dùng Spring Data repository trực tiếp trong application service. Chỉ tách persistence port khi cần domain độc lập khỏi Spring/JPA hoặc có adapter thứ hai, tránh tạo interface chỉ để trang trí.
 
 ## Ownership
 

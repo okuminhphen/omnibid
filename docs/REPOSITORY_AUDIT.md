@@ -1,6 +1,7 @@
 # OmniBid repository audit
 
-Ngày hoàn tất kiểm tra: **2026-08-20**
+Lần kiểm tra build đầy đủ: **2026-08-20**<br>
+Lần review cấu trúc/SOLID gần nhất: **2026-09-04**
 
 Nhánh kiểm tra: **`develop`**
 
@@ -12,13 +13,32 @@ Repository hiện đạt trạng thái có thể mở pull request: mã nguồn 
 
 Badge CI trên README chỉ chuyển sang trạng thái thực sau khi nhánh `develop` được push và workflow GitHub Actions chạy thành công trên GitHub.
 
+## Review cấu trúc và SOLID ngày 04/09/2026
+
+Kết luận: codebase được tổ chức tốt cho portfolio microservices, đặc biệt ở service ownership, auction command path, concurrency và messaging reliability. Đây là **pragmatic clean architecture**, không phải clean/hexagonal tuyệt đối.
+
+Đã xử lý trong lần review:
+
+- Refund consumer không còn ACK redelivery chỉ vì Redis giữ `PROCESSING`; PostgreSQL durable idempotency là nguồn sự thật và Redis chỉ cache `SUCCESS` sau commit.
+- Redis lookup/write failure không chặn refund database hoặc làm fail lại một refund đã commit.
+- Admin top-up API bắt buộc `X-Idempotency-Key`; server không tự sinh key mới cho một request có thể được retry.
+- README sửa đúng 5 child modules/6 reactor projects và đồng bộ số test.
+
+Các trade-off còn chủ động giữ lại:
+
+- Identity/wallet application service còn phụ thuộc Spring Data trực tiếp; entity identity còn public setter.
+- `UserAccountService` và `WalletAccountService` đang chứa nhiều use case, cần tách khi nghiệp vụ tiếp tục tăng.
+- Event DTO còn lặp giữa producer/consumer; schema version mới là compatibility guard thủ công, chưa có schema registry/contract test.
+- Frontend có các page component 176-292 dòng; cần tách feature component/hook trước khi thêm admin dashboard.
+- Chưa có automated architecture test để enforce dependency direction.
+
 ## Verification matrix
 
 | Gate | Lệnh / kiểm tra | Kết quả |
 | --- | --- | --- |
 | Backend toolchain | JDK 21.0.1, Maven 3.9.12 | Pass |
 | Backend reactor | `mvn --batch-mode --no-transfer-progress clean verify` | Pass, 6/6 reactor projects |
-| Backend tests | Suite hiện tại: Identity 12, Auction 18, Wallet 8, Audit 1 | 35 non-container tests pass; 4 Testcontainers tests chạy khi Docker/CI bật |
+| Backend tests | Suite hiện tại: Identity 12, Auction 18, Wallet 11, Audit 1 | 38 non-container tests pass; 4 Testcontainers tests chạy khi Docker/CI bật |
 | PostgreSQL integration | Auction/wallet Flyway migrations và unique idempotency constraints trên PostgreSQL 16 Testcontainers | Pass |
 | Redis concurrency | 20 contenders dùng Redisson lock trên Redis 7.4 Testcontainers | Pass, max critical-section concurrency = 1 |
 | Frontend toolchain | Node.js 20.20.2 | Pass |
@@ -89,6 +109,8 @@ Next.js 16 tự tái tạo `next-env.d.ts` với đường dẫn khác nhau gi�
 7. Google One Tap cần một Google Web Client ID thực và HTTPS origin khi deploy; project không cung cấp dev-login backdoor ở bất kỳ profile nào.
 8. Chưa có Kubernetes manifests, secret manager, TLS/mTLS, OpenTelemetry collector, metrics/alerts, SLO, backup/restore drill hoặc disaster-recovery runbook.
 9. Ví chỉ mô phỏng internal credits, không kết nối ngân hàng, payment gateway, KYC/AML hoặc sổ cái kế toán kép.
+10. Identity outbox query chưa dùng `SKIP LOCKED`; consumer vẫn idempotent nhưng scale nhiều identity publisher instance có thể tạo thêm duplicate delivery.
+11. Service và frontend boundary chưa được enforce bằng ArchUnit/lint rule; hiện phụ thuộc code review và convention.
 
 Các giới hạn này không chặn việc dùng repository làm portfolio. Chúng là các hướng mở rộng có giá trị để thảo luận trong phỏng vấn và tránh tuyên bố quá mức trong CV.
 

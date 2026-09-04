@@ -1,6 +1,6 @@
 # OmniBid Fresher Hardening — What Changed and Why
 
-Ngày cập nhật: **2026-08-20**  
+Ngày cập nhật: **2026-09-04**<br>
 Nhánh: **`develop`**
 
 Tài liệu này ghi lại gói cải thiện có tỷ lệ giá trị/độ phức tạp tốt nhất cho một fresher backend: đủ sâu để thảo luận distributed systems trong phỏng vấn, nhưng không thêm công nghệ chỉ để làm đẹp CV.
@@ -29,7 +29,7 @@ Scheduled publisher:
 4. Chỉ sau broker ack mới ghi `published_at`.
 5. Khi lỗi, giữ event pending, tăng `attempts` và lưu `last_error` để retry.
 
-Delivery là **at-least-once**, không tuyên bố exactly-once. Consumer vẫn phải idempotent: audit dùng `bidId` làm Mongo `_id`; refund dùng `transactionId`, Redis fast dedupe và PostgreSQL unique constraint.
+Delivery là **at-least-once**, không tuyên bố exactly-once. Consumer vẫn phải idempotent: audit dùng `bidId` làm Mongo `_id`; refund dùng `transactionId`, Redis `SUCCESS` cache và PostgreSQL unique constraint.
 
 ## 3. Distributed lock không hết lease giữa critical section
 
@@ -51,13 +51,13 @@ Refund outbox ID được tạo xác định từ wallet transaction ID. Gọi e
 
 ## 5. Integration và concurrency tests
 
-Full backend hiện có **39 tests**:
+Full backend hiện có **42 tests**:
 
 | Module | Tests | Nội dung nổi bật |
 | --- | ---: | --- |
 | Identity | 12 | refresh rotation, reuse detection, token hashing, origin filter, cookie policy, admin bootstrap/claim, PostgreSQL schema |
 | Auction | 18 | use cases, domain invariant, privacy projection, lock adapter, compensation, outbox, scheduler, PostgreSQL schema, Redis contention |
-| Wallet | 8 | balance invariant, account commands, new/replayed reservation, refund idempotency, PostgreSQL schema |
+| Wallet | 11 | balance invariant, account commands, new/replayed reservation, refund idempotency, Redis failure fallback, PostgreSQL schema |
 | Audit | 1 | idempotent Mongo document identity |
 
 Testcontainers tạo PostgreSQL 16 và Redis 7.4 thật. Redis test cho 20 thread bắt đầu đồng thời và chứng minh `maxConcurrent == 1` trong critical section.
@@ -73,6 +73,8 @@ Testcontainers tạo PostgreSQL 16 và Redis 7.4 thật. Redis test cho 20 threa
 | Bid request chạy lâu hơn 5 giây | Watchdog gia hạn distributed lock |
 | Scheduler và admin cùng end auction | Cùng Redis lock; refund command ID xác định và durable dedupe |
 | Redis mất idempotency refund key | PostgreSQL unique transaction vẫn là safety net bền vững |
+| Consumer crash sau khi nhận refund | Không dùng `PROCESSING` marker để ACK; redelivery vẫn đi qua PostgreSQL durable idempotency |
+| Redis lỗi khi đọc/ghi refund cache | Refund vẫn xử lý bằng PostgreSQL; lỗi cache không làm fail một DB commit đã thành công |
 | Wallet freeze mới thành công nhưng auction DB rollback | `ReleaseDeposit` compensation dùng original transaction ID; crash trước compensation vẫn cần reconciliation |
 
 ## Lệnh kiểm chứng
@@ -91,7 +93,7 @@ npm run build
 Kết quả đã xác minh trong đợt hardening này:
 
 - Maven reactor: 6/6 project thành công.
-- Backend trong lần refactor 31/08: 35 non-container tests pass; 4 Testcontainers tests cần Docker Desktop hoặc GitHub Actions.
+- Backend ngày 04/09: 38 non-container tests pass; 4 Testcontainers tests cần Docker Desktop hoặc GitHub Actions.
 - Frontend typecheck: pass.
 - Next.js production build: pass, 6 routes.
 - Docker infrastructure: 6/6 container healthy.
